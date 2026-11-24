@@ -2,13 +2,26 @@
 
 面向社区、CMS 等通用全文检索的纯 C 词典分词工具包。仅支持 UTF-8；运行时无第三方依赖。词典保留最多两个 ASCII 字符的词性，不包含 IDF。
 
-当前阶段：词典流水线已完成，UTF-8 核心库开发中，PHP 扩展随后重写。开发状态见 [README-2.0.md](README-2.0.md)。
+当前已提供词典流水线、UTF-8 核心库和 CLI 原型，PHP 扩展随后重写。尚未通过真实检索质量验收。开发状态见 [README-2.0.md](README-2.0.md)，C 接口见 [API.md](API.md)。
+
+## 构建与运行
+
+需要 C11 编译器、Make 和 ar；当前 Makefile 支持 macOS/Linux，Windows 构建尚未验证。Python 3.9+ 仅用于词典加工及测试。
+
+```sh
+make -j2
+make check
+build/scws -d build/dict/dictionary.xdb --search -i '中文分词测试'
+printf '南京市长江大桥\n' | build/scws -d build/dict/dictionary.xdb
+```
+
+构建生成静态库、共享库、CLI 和词典编译器。`make install PREFIX=/path/to/prefix` 安装库、头文件、工具及规则数据，不自动安装下载词典。CLI 默认从标准输入读取全部 UTF-8 文本，以 TSV 输出字节跨度、字符跨度、词性、种类、来源和原词。`--bigrams` 可在搜索模式开启未知汉字二元兜底，`--symbols` 保留符号。
 
 ## 词典
 
 ```sh
 mkdir -p build
-cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror tools/scws2-dict.c -o build/scws2-dict
+make build/scws2-dict
 python3 tools/dict.py fetch
 python3 tools/dict.py build
 python3 -m unittest discover -s tests -p 'test_dictionary.py' -v

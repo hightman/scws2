@@ -1,0 +1,54 @@
+CC ?= cc
+AR ?= ar
+PYTHON ?= python3
+PREFIX ?= /usr/local
+CFLAGS ?= -O2
+CPPFLAGS += -Iinclude -Isrc
+WARNINGS = -std=c11 -Wall -Wextra -Wpedantic -Werror
+SYSTEM := $(shell uname -s)
+ifeq ($(SYSTEM),Darwin)
+SHARED = build/libscws.dylib
+SHARED_FLAGS = -dynamiclib -Wl,-install_name,@rpath/libscws.dylib
+else
+SHARED = build/libscws.so
+SHARED_FLAGS = -shared
+endif
+OBJECTS = build/scws.o build/utf8.o build/xdb.o
+
+.PHONY: all check test dict install clean
+all: build/libscws.a $(SHARED) build/scws build/scws2-dict
+
+build:
+	mkdir -p build
+
+build/%.o: src/%.c include/scws.h src/utf8.h src/xdb.h | build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) -fPIC -c $< -o $@
+
+build/libscws.a: $(OBJECTS)
+	$(AR) rcs $@ $(OBJECTS)
+
+$(SHARED): $(OBJECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(SHARED_FLAGS) $(OBJECTS) -o $@
+
+build/scws: cli/scws.c build/libscws.a include/scws.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) cli/scws.c build/libscws.a $(LDFLAGS) -o $@
+
+build/scws2-dict: tools/scws2-dict.c | build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) $< $(LDFLAGS) -o $@
+
+check test: all
+	$(PYTHON) -B -m unittest discover -s tests -p 'test_*.py' -v
+
+dict: build/scws2-dict
+	$(PYTHON) -B tools/dict.py build
+
+install: all
+	install -d $(DESTDIR)$(PREFIX)/include $(DESTDIR)$(PREFIX)/lib $(DESTDIR)$(PREFIX)/bin $(DESTDIR)$(PREFIX)/share/scws
+	install -m 644 include/scws.h $(DESTDIR)$(PREFIX)/include/
+	install -m 644 build/libscws.a $(SHARED) $(DESTDIR)$(PREFIX)/lib/
+	install -m 755 build/scws $(DESTDIR)$(PREFIX)/bin/
+	install -m 755 build/scws2-dict $(DESTDIR)$(PREFIX)/bin/scws-dict
+	install -m 644 etc/rules.ini etc/rules_cht.ini $(DESTDIR)$(PREFIX)/share/scws/
+
+clean:
+	rm -rf build

@@ -6,22 +6,24 @@
 
 ## 项目结构与事实来源
 
-2.0 状态以 `README-2.0.md` 为准。`dict/README.md` 描述词典流水线，`dict/FORMAT.md` 定义 XDB2 字节契约，`dict/sources.lock.json` 锁定上游。`tools/dict.py` 负责获取和加工，`tools/scws2-dict.c` 为无第三方依赖的 C 编译器，`tests/test_dictionary.py` 为离线集成测试。
+2.0 状态以 `README-2.0.md` 为准，公共 API 契约见 `API.md`。`include/scws.h` 为公共接口，`src/` 为核心与 XDB2 加载器，`cli/scws.c` 为 CLI。`dict/README.md` 描述词典流水线，`dict/FORMAT.md` 定义 XDB2 字节契约，`dict/sources.lock.json` 锁定上游。`tools/dict.py` 负责获取和加工，`tools/scws2-dict.c` 为纯 C 编译器；`tests/` 包含离线词典/核心集成测试及原生 C API 测试。
 
 旧引擎、字符集层、Autotools 构建及历史演示已移除；Git 历史和主分支保留 1.x 实现。`phpext/` 等待核心稳定后重写。`etc/rules.ini`、`etc/rules_cht.ini` 均为 UTF-8，暂不执行旧 INI 规则。不要修改另一个 worktree 或清理用户原有文件。
 
 ## 开发与验证
 
 ```sh
-mkdir -p build
-cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror tools/scws2-dict.c -o build/scws2-dict
+make -j2
+make check
 python3 tools/dict.py fetch
 python3 tools/dict.py build
 python3 tools/dict.py check build/dict/dictionary.xdb
-python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
+build/scws -d build/dict/dictionary.xdb --search -i '中文分词测试'
 ```
 
 只有显式 `fetch` 联网；测试不依赖上游或本机词典。`build/`、`.cache/` 和 Python 缓存不提交，源词典快照应另行归档。运行库与编译器保持纯 C；Python 只用于离线加工、校验和测试。
+
+核心变更需要验证主路径、重叠补词、原文偏移、非法 UTF-8、词典损坏、上下文生命周期及共享词典线程安全。`CORE_TEST_CFLAGS`、`DICT_TEST_CFLAGS` 可覆盖测试编译选项以启用 ASan/UBSan。不要将代码测试通过等同于真实检索质量验收。
 
 ## 编码与数据规范
 

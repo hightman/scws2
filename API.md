@@ -1,0 +1,79 @@
+# SCWS 2 C API
+
+公共头文件为 `include/scws.h`。仅接受 UTF-8，API 与 1.x 不兼容。运行时只使用 C 标准库；无字符集切换、关键词提取和 IDF 接口。
+
+## 最小用法
+
+```c
+#include <stdio.h>
+#include <string.h>
+#include "scws.h"
+
+int main(void)
+{
+    scws_dict *dict = NULL;
+    scws *ctx = NULL;
+    const char *text = "中文分词测试";
+    scws_status status = scws_dict_open("build/dict/dictionary.xdb", &dict);
+    if (!status) status = scws_new(dict, &ctx);
+    if (!status) status = scws_segment(ctx, text, strlen(text), SCWS_SEARCH);
+    if (!status) {
+        const scws_token *token;
+        while ((token = scws_next(ctx)) != NULL) {
+            fwrite(text + token->offset, 1, token->length, stdout);
+            printf("\t%s\n", token->pos);
+        }
+    }
+    scws_free(ctx);
+    scws_dict_close(dict);
+    return status != SCWS_OK;
+}
+```
+
+构建后可用 `cc -Iinclude example.c build/libscws.a -o example` 链接静态库。
+
+## 词典与生命周期
+
+`scws_dict_open(path, &dict)` 读取 XDB2 schema 3，并校验头部、全部节点、树指针、词性、桶归属及前缀闭包。当前加载器最多接受 512 MiB 文件，全部读入内存；不支持旧 XDB 或旧 schema。
+
+校验后的词典不可变，可供多个线程的独立上下文共享。`scws_new(dict, &ctx)` 不复制词典；调用者必须先释放所有引用它的上下文，再调用 `scws_dict_close`。同一上下文不能并发使用。没有隐式的全局词典或临时磁盘缓存。
+
+`scws_add_dict(ctx, overlay)` 添加已加载词典。同一完整词以后添加的定义为准，前缀信息取并集；把完整词标记为只补词可阻止该词参与主切分。当前没有运行时禁用词的 tombstone 标志，构建阶段的 `deny` 不等于可以删除另一份叠加词典里的词。
+
+## 分词模式与结果
+
+`scws_segment(ctx, text, byte_length, mode)` 完整校验 UTF-8 后计算结果。输入仅在调用期间使用，不保存输入指针。传入明确长度，可包含作为分隔符的 NUL。非法 UTF-8、非法参数或分配失败会清空旧结果，不返回部分切分。
+
+- `SCWS_STANDARD`：以词典候选构成 DAG，通过动态规划输出不重叠的主切分。
+- `SCWS_SEARCH`：保留主词，增加有 SEARCH 资格的多字符词典匹配（可以跨主词边界）和英文/数字片段。
+
+评分仅使用切分代价，不使用词性。默认未知字符代价为 18432，英文数字整体代价为 8192，均按 1024 缩放；这是初始参数，尚未通过真实检索评估调优。同分时依次优先更少词、较长的当前词和词典来源。
+
+`scws_set_options(ctx, flags, unknown_cost)` 配置非零未知字符代价和以下选项：
+
+- `SCWS_KEEP_SYMBOLS`：输出符号；空白和控制分隔符始终跳过。
+- `SCWS_FALLBACK_BIGRAM`：仅在搜索模式下，对主路径中连续的未知汉字单字增加二元片段，词性为空。默认关闭，不跨已识别词或空白生成片段。
+
+结果字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `offset`, `length` | 原文 UTF-8 字节跨度 |
+| `char_offset`, `char_length` | Unicode 标量跨度，不是字形簇或搜索引擎 token position |
+| `pos` | 最多两个 ASCII 字符，C 字符串以 NUL 结尾；未知为空 |
+| `kind` | `SCWS_PRIMARY`、`SCWS_SECONDARY`、`SCWS_FALLBACK` |
+| `origin` | `SCWS_DICTIONARY`、`SCWS_BUILTIN`、`SCWS_UNKNOWN` |
+
+同一原文跨度只输出一次，主词优先；结果按字节起点递增，同起点长词在前。`scws_next` 返回上下文拥有的结果指针，下一次 `scws_segment` 或释放上下文时失效。`scws_count` 返回总结果数，不随遍历递减。
+
+英文和数字可与内部 `- _ . / & '` 连接，字母片段可带末尾 `+ #`；例如 `GPT-4o`、`C++`、`Wi-Fi`、`iPhone16Pro`。全角 ASCII 仅采用相同的字符分类，不改写词面或原文偏移。没有内置大小写转换、简繁转换或完整 Unicode 词边界模型。
+
+## 当前检索边界
+
+搜索模式的词典补词尚无经过评估的歧义置信度过滤。例如旧基础词典可能包含“京市”“据库”，某些上下文也会召回不同切分路径的词。应用应区分主词、补词与兜底片段，不能把所有输出无差别当成必选查询条件。需要真实检索评估后再确定默认补词策略和权重。
+
+`etc/rules.ini` 与 `etc/rules_cht.ini` 已统一为 UTF-8 文件名，但新核心尚不解析它们。旧 `[attrs]` 倍率、人名规则及统计参数没有被自动启用。
+
+## 状态码
+
+API 用 `scws_status` 返回参数、内存、I/O、词典格式、UTF-8 和资源限制错误；`scws_strerror` 给出静态错误说明。输出句柄参数在失败时置空。`scws_free(NULL)`、`scws_dict_close(NULL)` 可安全调用。
