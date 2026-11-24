@@ -6,7 +6,7 @@
 
 ## 构建与运行
 
-需要 C11 编译器、Make 和 ar；当前 Makefile 支持 macOS/Linux，Windows 构建尚未验证。Python 3.9+ 仅用于词典加工及测试。
+需要 C11 编译器、Make 和 ar；当前 Makefile 支持 macOS/Linux，Windows 构建尚未验证。Python 3.9+ 用于构建时生成规则表、词典加工及测试，运行时不需要。
 
 ```sh
 make -j2
@@ -15,7 +15,7 @@ build/scws -d build/dict/dictionary.xdb --search -i '中文分词测试'
 printf '南京市长江大桥\n' | build/scws -d build/dict/dictionary.xdb
 ```
 
-构建生成静态库、共享库、CLI 和词典编译器。`make install PREFIX=/path/to/prefix` 安装库、头文件、工具及规则数据，不自动安装下载词典。CLI 默认从标准输入读取全部 UTF-8 文本，以 TSV 输出字节跨度、字符跨度、词性、种类、来源和原词。`--bigrams` 可在搜索模式开启未知汉字二元兜底，`--symbols` 保留符号。
+构建生成静态库、共享库、CLI 和词典编译器。`make install PREFIX=/path/to/prefix` 安装库、头文件和工具，不自动安装下载词典。CLI 默认从标准输入读取全部 UTF-8 文本，以 TSV 输出字节跨度、字符跨度、词性、种类、来源和原词。`--bigrams` 可在搜索模式开启未知汉字二元兜底，`--symbols` 保留符号。
 
 ## 词典
 
@@ -31,7 +31,7 @@ python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
 
 ## 规则与迁移
 
-简体、繁体规则分别使用 `etc/rules.ini`、`etc/rules_cht.ini`，均为 UTF-8，只保留符号、中文数字和数量单位。内置识别支持明确的中文整数、小数、金融数字、序数和数字加单位，不进行姓名、地名猜测或词性倍率打分。修改数据后执行 `make rules && make`，运行时不依赖 INI；详细边界见 [etc/README.md](etc/README.md)。
+规则统一在 `src/rules.ini`，同一份 UTF-8 数据同时维护简繁写法，只保留符号、中文数字和数量单位。内置识别支持明确的中文整数、小数、金融数字、序数和数字加单位，不进行姓名、地名猜测或词性倍率打分。`make` 按规则源和生成器的修改时间自动更新 `build/rules_data.h` 并重新编译，生成代码不进入 Git，运行时不依赖 INI；详细边界见 [src/RULES.md](src/RULES.md)。
 
 2.0 不兼容 1.x 的 API 和 XDB。旧字符集代码、旧引擎、历史 PHP 演示及配套构建已移除，可从 Git 历史或主分支查阅。旧 PHP 扩展不再作为 2.0 可构建组件发布。
 

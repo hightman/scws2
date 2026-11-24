@@ -57,8 +57,8 @@ supported tags are preserved. An unmapped source label longer than two
 characters fails instead of being truncated. The manifest records this
 mapping as `jieba-compact-v1`; it does not claim full compatibility with
 SCWS 1 rule semantics. Original source labels remain in the locked upstream
-snapshot. A term stores one default tag; no POS disambiguation or
-`rules.ini` evaluation is implemented.
+snapshot. A term stores one default tag; no contextual POS disambiguation or
+POS-based path scoring is implemented.
 
 | Flag | Value | Meaning |
 | --- | --- | --- |

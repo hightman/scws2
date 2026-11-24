@@ -3,7 +3,7 @@ AR ?= ar
 PYTHON ?= python3
 PREFIX ?= /usr/local
 CFLAGS ?= -O2
-CPPFLAGS += -Iinclude -Isrc
+CPPFLAGS += -Iinclude -Isrc -Ibuild
 WARNINGS = -std=c11 -Wall -Wextra -Wpedantic -Werror
 SYSTEM := $(shell uname -s)
 ifeq ($(SYSTEM),Darwin)
@@ -21,7 +21,10 @@ all: build/libscws.a $(SHARED) build/scws build/scws2-dict
 build:
 	mkdir -p build
 
-build/%.o: src/%.c include/scws.h src/utf8.h src/xdb.h src/rules.h src/rules_data.h | build
+build/rules_data.h: src/rules.ini tools/gen_rules.py | build
+	$(PYTHON) -B tools/gen_rules.py --output $@
+
+build/%.o: src/%.c include/scws.h src/utf8.h src/xdb.h src/rules.h build/rules_data.h | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) -fPIC -c $< -o $@
 
 build/libscws.a: $(OBJECTS)
@@ -41,18 +44,17 @@ check test: all
 	$(PYTHON) -B -m unittest discover -s tests -p 'test_*.py' -v
 
 rules:
-	$(PYTHON) -B tools/gen_rules.py
+	$(PYTHON) -B tools/gen_rules.py --output build/rules_data.h
 
 dict: build/scws2-dict
 	$(PYTHON) -B tools/dict.py build
 
 install: all
-	install -d $(DESTDIR)$(PREFIX)/include $(DESTDIR)$(PREFIX)/lib $(DESTDIR)$(PREFIX)/bin $(DESTDIR)$(PREFIX)/share/scws
+	install -d $(DESTDIR)$(PREFIX)/include $(DESTDIR)$(PREFIX)/lib $(DESTDIR)$(PREFIX)/bin
 	install -m 644 include/scws.h $(DESTDIR)$(PREFIX)/include/
 	install -m 644 build/libscws.a $(SHARED) $(DESTDIR)$(PREFIX)/lib/
 	install -m 755 build/scws $(DESTDIR)$(PREFIX)/bin/
 	install -m 755 build/scws2-dict $(DESTDIR)$(PREFIX)/bin/scws-dict
-	install -m 644 etc/rules.ini etc/rules_cht.ini $(DESTDIR)$(PREFIX)/share/scws/
 
 clean:
 	rm -rf build

@@ -12,7 +12,7 @@
 
 第一阶段用法与限制见 [dict/README.md](dict/README.md)，文件契约见 [dict/FORMAT.md](dict/FORMAT.md)。旧引擎、字符集层、Autotools 构建及依赖旧 API 的历史演示已从本分支移除，Git 历史和主分支保留对照实现。PHP 扩展等待核心稳定后重写。
 
-规则统一为 `etc/rules.ini`、`etc/rules_cht.ini`，均使用 UTF-8，仅保留 `symbol`、`chnum0–5`、`munit` 数据，通过 `make rules` 生成 C 表。已实现保守的数字和数量识别及符号分类，不引入旧通用 INI 解释器。支持边界见 `etc/README.md`。
+规则统一为 `src/rules.ini`，同一份 UTF-8 数据包含简繁写法，仅保留 `symbol`、`chnum0–5`、`munit`。`make` 按依赖时间自动生成 `build/rules_data.h`，生成代码不进入 Git。已实现保守的数字和数量识别及符号分类，不引入旧通用 INI 解释器。支持边界见 `src/RULES.md`。
 
 `make` 构建核心与 CLI，`make check` 执行离线测试；API 契约参见 `API.md`。核心不再含字符集切换代码。搜索补词的歧义筛选仍待评估，基础词典旧词及新词不足问题不会因替换解码算法自动消失。
 
