@@ -103,11 +103,12 @@ class CoreTests(unittest.TestCase):
         self.assertEqual([t['word'] for t in self.invoke('人工智能', *options)], ['人工', '智能'])
 
     def test_ascii_products_numbers_and_original_spans(self):
-        text = 'GPT-4o C++ C# Wi-Fi iPhone16Pro 3.14 2024-11-24'
+        text = 'GPT-4o C++ C# R&B P&G J++ J# UTF-8 PS/2 Wi-Fi iPhone16Pro 3.14 2024-11-24'
         tokens = self.invoke(text)
         self.assertEqual([t['word'] for t in tokens], text.split())
         self.assertEqual(tokens[-2]['pos'], 'm')
         search = self.invoke(text, '--search')
+        self.assertEqual([t['word'] for t in search if t['kind'] == 'primary'], text.split())
         self.assertTrue({'GPT', '4', 'iPhone', '16', 'Pro', 'Wi', 'Fi'} <= {t['word'] for t in search})
         raw = text.encode()
         for token in search:
