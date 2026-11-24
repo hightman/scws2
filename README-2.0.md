@@ -10,6 +10,8 @@
 2. **核心库与测试**：只读共享词典、UTF-8/英文数字处理、候选 DAG、动态规划、standard/search 模式和可区分来源的补词。尚未实现。
 3. **PHP 扩展**：薄封装对象接口，结果与 C 核心一致。尚未实现。
 
-第一阶段用法与限制见 [dict/README.md](dict/README.md)，文件契约见 [dict/FORMAT.md](dict/FORMAT.md)。旧版目录暂保留，用于对照；根目录旧 `README.md`、Autotools 构建与 `phpext/` 仍描述 1.x，不能当成 2.0 接口契约。
+第一阶段用法与限制见 [dict/README.md](dict/README.md)，文件契约见 [dict/FORMAT.md](dict/FORMAT.md)。旧引擎、字符集层、Autotools 构建及依赖旧 API 的历史演示已从本分支移除，Git 历史和主分支保留对照实现。PHP 扩展等待核心稳定后重写。
+
+规则统一为 `etc/rules.ini`、`etc/rules_cht.ini`，均使用 UTF-8；旧规则数据保留，尚未接入新核心。
 
 正式发布前建立分词与小型检索评估集，测量召回、误召回、词数、内存与速度；未验证的词典更新不自动发布。引擎代码采用现有 `COPYING`，词典包单独附带各数据来源的许可。

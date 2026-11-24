@@ -8,7 +8,7 @@
 
 2.0 状态以 `README-2.0.md` 为准。`dict/README.md` 描述词典流水线，`dict/FORMAT.md` 定义 XDB2 字节契约，`dict/sources.lock.json` 锁定上游。`tools/dict.py` 负责获取和加工，`tools/scws2-dict.c` 为无第三方依赖的 C 编译器，`tests/test_dictionary.py` 为离线集成测试。
 
-`libscws/`、`cli/`、`phpext/`、`etc/`、`dev/`、`web/` 及旧 Autotools 文件暂时保留，属于 1.x 对照实现，不是 2.0 API 契约。不要修改另一个 worktree 或清理用户原有文件。
+旧引擎、字符集层、Autotools 构建及历史演示已移除；Git 历史和主分支保留 1.x 实现。`phpext/` 等待核心稳定后重写。`etc/rules.ini`、`etc/rules_cht.ini` 均为 UTF-8，暂不执行旧 INI 规则。不要修改另一个 worktree 或清理用户原有文件。
 
 ## 开发与验证
 
