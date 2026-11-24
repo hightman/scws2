@@ -1,4 +1,5 @@
 #include "utf8.h"
+#include "rules.h"
 
 size_t scws_utf8_decode(const unsigned char *s, size_t length, uint32_t *scalar)
 {
@@ -39,7 +40,8 @@ int scws_space(uint32_t ch)
 int scws_symbol(uint32_t ch)
 {
 	ch = scws_ascii_width(ch);
-	return (ch < 0x80 && !scws_alpha(ch) && !scws_digit(ch))
+	return scws_rule_symbol(ch) || (ch < 0x80 && !scws_alpha(ch) && !scws_digit(ch))
+		|| (ch >= 0x20a0 && ch <= 0x20cf) || (ch >= 0xffe0 && ch <= 0xffe6)
 		|| (ch >= 0x200c && ch <= 0x206f) || (ch >= 0x2600 && ch <= 0x27bf)
 		|| (ch >= 0x3001 && ch <= 0x303f) || (ch >= 0xfe00 && ch <= 0xfe0f)
 		|| (ch >= 0xfe10 && ch <= 0xfe6f) || (ch >= 0x1f000 && ch <= 0x1faff);

@@ -21,7 +21,7 @@ class CoreTests(unittest.TestCase):
         cls.api = cls.root / 'api-test'
         cc = shlex.split(os.environ.get('CC', 'cc'))
         flags = ['-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + shlex.split(os.environ.get('CORE_TEST_CFLAGS', '-O2'))
-        source = [str(ROOT / name) for name in ('src/scws.c', 'src/utf8.c', 'src/xdb.c')]
+        source = [str(ROOT / name) for name in ('src/scws.c', 'src/utf8.c', 'src/xdb.c', 'src/rules.c')]
         includes = ['-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src')]
         for main, output, extra in [('cli/scws.c', cls.cli, []), ('tests/core_api.c', cls.api, ['-pthread'])]:
             subprocess.run(cc + flags + includes + source + [str(ROOT / main), '-o', str(output)] + extra, check=True)
@@ -34,6 +34,7 @@ class CoreTests(unittest.TestCase):
             ('人工智能', 80, 3, 'n'), ('人工', 100, 3, 'n'), ('智能', 100, 3, 'n'),
             ('大模型', 0, 2, ''), ('中', 100, 3, 'n'), ('中国', 100, 3, 'ns'),
             ('中文', 100, 3, 'n'), ('测试', 100, 3, 'vn'), ('𠀀词', 100, 3, 'nz'),
+            ('三点', 10000, 3, 'm'), ('五公斤', 10000, 3, 'mq'), ('阿·明', 100, 3, 'nr'),
             ('𠀀' * 60, 10, 3, 'nz')])
         cls.overlay = cls.build('overlay', [('研究', 5000, 3, 'n'), ('人工智能', 0, 2, 'nz')])
 
@@ -184,6 +185,49 @@ class CoreTests(unittest.TestCase):
 
     def test_removed_charset_option_is_rejected(self):
         self.invoke('中文', '-c', 'gbk', success=False)
+
+    def test_numeric_rules_without_numeric_dictionary_entries(self):
+        cases = {'一九四九年': 'mq', '二〇二六年': 'mq', '壹佰贰拾元': 'mq', '壹佰貳拾圓': 'mq',
+                 '第十五章': 'mq', '每三个月': 'mq', '每三個月': 'mq', '三点五公斤': 'mq',
+                 '三點五公斤': 'mq', '３．５％': 'mq', '三千万元': 'mq', '3.5万': 'm',
+                 '3.5万元': 'mq', '五千克': 'mq', '三千米': 'mq', '一亿零三万': 'm',
+                 '十二万三千四百五十六': 'm'}
+        for text, pos in cases.items():
+            with self.subTest(text=text):
+                tokens = self.invoke(text)
+                self.assertEqual([(t['word'], t['pos'], t['origin']) for t in tokens], [(text, pos, 'builtin')])
+
+    def test_numeric_search_preserves_number_and_unit_boundaries(self):
+        tokens = self.invoke('三点五公斤', '--search')
+        self.assertEqual({t['word'] for t in tokens}, {'三点五公斤', '三点五', '公斤'})
+        self.assertEqual([(t['word'], t['pos']) for t in tokens if t['kind'] == 'primary'], [('三点五公斤', 'mq')])
+        tokens = self.invoke('第十五章', '--search')
+        self.assertEqual({t['word'] for t in tokens}, {'第十五章', '十五', '章'})
+        self.assertEqual([t['word'] for t in self.invoke('２０２６年１１月')], ['２０２６年', '１１月'])
+
+    def test_ambiguous_idioms_and_malformed_numbers_are_not_forced(self):
+        for text in ('一心一意', '三心二意', '一般情况', '每个人', '千万不要', '两三年', '一两年',
+                     '一百百', '十百', '三点五点六', '一万亿'):
+            with self.subTest(text=text):
+                self.assertFalse(any(t['origin'] == 'builtin' and t['pos'] in ('m', 'mq') for t in self.invoke(text)))
+
+    def test_numeric_spans_keep_original_offsets_and_scale_linearly(self):
+        text = '😀第十五章，３．５％'
+        raw = text.encode()
+        for token in self.invoke(text, '--search', '--symbols'):
+            self.assertEqual(raw[token['offset']:token['offset'] + token['length']].decode(), token['word'])
+            self.assertEqual(text[token['char_offset']:token['char_offset'] + token['char_length']], token['word'])
+        large = '一' * 5000 + '年'
+        tokens = self.invoke(large)
+        self.assertEqual(len(tokens), 1)
+        self.assertEqual((tokens[0]['length'], tokens[0]['char_length']), (len(large.encode()), len(large)))
+        self.assertFalse(any(t['origin'] == 'builtin' for t in self.invoke('一百百' * 3000)))
+
+    def test_currency_and_middle_dot_symbol_policy(self):
+        self.assertEqual(self.invoke('￥ ¥ € ·'), [])
+        self.assertEqual([t['word'] for t in self.invoke('￥ ¥ € ·', '--symbols')], ['￥', '¥', '€', '·'])
+        # Dictionary-backed names remain usable; no surname guessing is added.
+        self.assertEqual([t['word'] for t in self.invoke('阿·明')], ['阿·明'])
 
 
 if __name__ == '__main__':

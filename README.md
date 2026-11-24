@@ -31,7 +31,7 @@ python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
 
 ## 规则与迁移
 
-简体、繁体规则分别使用 `etc/rules.ini`、`etc/rules_cht.ini`，文件内容均为 UTF-8。旧词性语法规则的后续用途尚未确定，保留数据不代表已在新核心中执行。
+简体、繁体规则分别使用 `etc/rules.ini`、`etc/rules_cht.ini`，均为 UTF-8，只保留符号、中文数字和数量单位。内置识别支持明确的中文整数、小数、金融数字、序数和数字加单位，不进行姓名、地名猜测或词性倍率打分。修改数据后执行 `make rules && make`，运行时不依赖 INI；详细边界见 [etc/README.md](etc/README.md)。
 
 2.0 不兼容 1.x 的 API 和 XDB。旧字符集代码、旧引擎、历史 PHP 演示及配套构建已移除，可从 Git 历史或主分支查阅。旧 PHP 扩展不再作为 2.0 可构建组件发布。
 

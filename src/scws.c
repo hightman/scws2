@@ -1,10 +1,11 @@
 #include "scws.h"
 #include "utf8.h"
 #include "xdb.h"
+#include "rules.h"
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct { size_t offset, atom_end; uint32_t ch; char atom_pos[3]; } unit;
+typedef scws_unit unit;
 typedef struct {
 	uint64_t cost;
 	size_t to, tokens;
@@ -82,7 +83,8 @@ static int connector(uint32_t ch)
 }
 static int boundary(uint32_t ch)
 {
-	return scws_space(ch) || (scws_symbol(ch) && !connector(ch) && ch != '+' && ch != '#');
+	/* Middle dot is a separator by itself, but may belong to a dictionary word. */
+	return scws_space(ch) || (scws_symbol(ch) && !connector(ch) && ch != '+' && ch != '#' && ch != 0xb7);
 }
 static void atomize(unit *units, size_t count)
 {
@@ -198,6 +200,7 @@ scws_status scws_segment(scws *ctx, const char *input, size_t length, scws_mode 
 	}
 	units[count].offset = length;
 	atomize(units, count);
+	scws_rule_numbers(units, count);
 	for (size_t i = count; i-- > 0;) {
 		uint32_t ch = units[i].ch;
 		int space = scws_space(ch), symbol = scws_symbol(ch);
@@ -205,6 +208,12 @@ scws_status scws_segment(scws *ctx, const char *input, size_t length, scws_mode 
 		consider(paths, i, i + 1, space || symbol ? 0 : ctx->unknown_cost,
 			!space && (!symbol || !!(ctx->flags & SCWS_KEEP_SYMBOLS)), symbol ? "un" : "", symbol ? SCWS_BUILTIN : SCWS_UNKNOWN);
 		if (units[i].atom_end) consider(paths, i, units[i].atom_end, 8192, 1, units[i].atom_pos, SCWS_BUILTIN);
+		if (units[i].number_to) {
+			/* A quantified 每 expression must retain its measure unit. */
+			if (units[i].ch != 0x6bcf) consider(paths, i, units[i].number_to, 8192, 1, "m", SCWS_BUILTIN);
+			if (units[i].quantity_to > units[i].number_to)
+				consider(paths, i, units[i].quantity_to, 8192, 1, "mq", SCWS_BUILTIN);
+		}
 		for (size_t j = i; j < count; j++) {
 			size_t bytes = units[j + 1].offset - units[i].offset;
 			scws_word word;
@@ -216,6 +225,8 @@ scws_status scws_segment(scws *ctx, const char *input, size_t length, scws_mode 
 	}
 	for (size_t i = 0; i < count; i = paths[i].to) {
 		path *choice = &paths[i];
+		if (units[i].number_to && (choice->to == units[i].number_to || choice->to == units[i].quantity_to))
+			for (size_t j = i; j < choice->to; j++) units[j].numeric_owner = i + 1;
 		if (choice->emit) {
 			status = append(ctx, units, i, choice->to, choice->pos, SCWS_PRIMARY, choice->origin);
 			if (status) goto done;
@@ -225,11 +236,23 @@ scws_status scws_segment(scws *ctx, const char *input, size_t length, scws_mode 
 	if (mode == SCWS_SEARCH) {
 		size_t primary_count = ctx->count;
 		for (size_t i = 0; i < count; i++) {
+			size_t owner = units[i].numeric_owner;
+			int mixed = 0;
 			for (size_t j = i; j < count; j++) {
 				scws_word word;
+				int allowed = 1;
 				size_t bytes = units[j + 1].offset - units[i].offset;
 				if (bytes > 240 || boundary(units[j].ch)) break;
-				if (lookup(ctx, text + units[i].offset, bytes, &word) && j > i) {
+				if (units[j].numeric_owner != owner) mixed = 1;
+				if (mixed) allowed = 0;
+				else if (owner) {
+					const unit *number = &units[owner - 1];
+					size_t end = paths[owner - 1].to;
+					allowed = (i == owner - 1 && j + 1 == end)
+						|| (i == number->number_from && j + 1 == number->number_to)
+						|| (i == number->number_to && j + 1 == end);
+				}
+				if (lookup(ctx, text + units[i].offset, bytes, &word) && j > i && allowed) {
 					status = append(ctx, units, i, j + 1, word.pos, SCWS_SECONDARY, SCWS_DICTIONARY);
 					if (status) goto done;
 				}
@@ -244,6 +267,18 @@ scws_status scws_segment(scws *ctx, const char *input, size_t length, scws_mode 
 			/* append can realloc ctx->tokens, so copy all needed fields first. */
 			scws_token token = ctx->tokens[t];
 			size_t end = token.char_offset + token.char_length;
+			const unit *first = &units[token.char_offset];
+			if (first->number_to && (end == first->number_to || end == first->quantity_to)) {
+				if (first->number_from != token.char_offset || first->number_to != end) {
+					status = append(ctx, units, first->number_from, first->number_to, "m", SCWS_SECONDARY, SCWS_BUILTIN);
+					if (status) goto done;
+				}
+				if (end > first->number_to) {
+					status = append(ctx, units, first->number_to, end, "q", SCWS_SECONDARY, SCWS_BUILTIN);
+					if (status) goto done;
+				}
+				continue;
+			}
 			if (token.origin != SCWS_BUILTIN || token.char_length < 2) continue;
 			for (size_t i = token.char_offset, j; i < end; i = j) {
 				int alpha = scws_alpha(units[i].ch), digit = scws_digit(units[i].ch);

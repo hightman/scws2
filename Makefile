@@ -13,15 +13,15 @@ else
 SHARED = build/libscws.so
 SHARED_FLAGS = -shared
 endif
-OBJECTS = build/scws.o build/utf8.o build/xdb.o
+OBJECTS = build/scws.o build/utf8.o build/xdb.o build/rules.o
 
-.PHONY: all check test dict install clean
+.PHONY: all check test dict rules install clean
 all: build/libscws.a $(SHARED) build/scws build/scws2-dict
 
 build:
 	mkdir -p build
 
-build/%.o: src/%.c include/scws.h src/utf8.h src/xdb.h | build
+build/%.o: src/%.c include/scws.h src/utf8.h src/xdb.h src/rules.h src/rules_data.h | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) -fPIC -c $< -o $@
 
 build/libscws.a: $(OBJECTS)
@@ -37,7 +37,11 @@ build/scws2-dict: tools/scws2-dict.c | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) $< $(LDFLAGS) -o $@
 
 check test: all
+	$(PYTHON) -B tools/gen_rules.py --check
 	$(PYTHON) -B -m unittest discover -s tests -p 'test_*.py' -v
+
+rules:
+	$(PYTHON) -B tools/gen_rules.py
 
 dict: build/scws2-dict
 	$(PYTHON) -B tools/dict.py build

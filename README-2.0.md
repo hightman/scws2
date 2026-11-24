@@ -2,7 +2,7 @@
 
 目标是面向社区、CMS 检索的纯 C 词典分词工具包，运行时无第三方依赖，继续提供 PHP 扩展。2.0 接受 API 和词典格式不兼容；只支持 UTF-8，删除关键词提取及 IDF。名称暂沿用 SCWS。
 
-词典保留最多两个 ASCII 字符的可选词性，jieba `nrt`、`nrfg` 在加工时归并为 `nr`，缺失时为空，不参与切分评分。旧版 `rules.ini` 词性规则如何迁移尚未确定，目前只存储词条标签。当前唯一接入的上游是 jieba 标准词典，THUOCL 尚未融入。
+词典保留最多两个 ASCII 字符的可选词性，jieba `nrt`、`nrfg` 在加工时归并为 `nr`，缺失时为空，不参与切分评分。姓名、地名、词性倍率规则已明确移除，词性只作标签。当前唯一接入的上游是 jieba 标准词典，THUOCL 尚未融入。
 
 开发顺序：
 
@@ -12,7 +12,7 @@
 
 第一阶段用法与限制见 [dict/README.md](dict/README.md)，文件契约见 [dict/FORMAT.md](dict/FORMAT.md)。旧引擎、字符集层、Autotools 构建及依赖旧 API 的历史演示已从本分支移除，Git 历史和主分支保留对照实现。PHP 扩展等待核心稳定后重写。
 
-规则统一为 `etc/rules.ini`、`etc/rules_cht.ini`，均使用 UTF-8；旧规则数据保留，尚未接入新核心。
+规则统一为 `etc/rules.ini`、`etc/rules_cht.ini`，均使用 UTF-8，仅保留 `symbol`、`chnum0–5`、`munit` 数据，通过 `make rules` 生成 C 表。已实现保守的数字和数量识别及符号分类，不引入旧通用 INI 解释器。支持边界见 `etc/README.md`。
 
 `make` 构建核心与 CLI，`make check` 执行离线测试；API 契约参见 `API.md`。核心不再含字符集切换代码。搜索补词的歧义筛选仍待评估，基础词典旧词及新词不足问题不会因替换解码算法自动消失。
 

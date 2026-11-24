@@ -8,13 +8,14 @@
 
 2.0 状态以 `README-2.0.md` 为准，公共 API 契约见 `API.md`。`include/scws.h` 为公共接口，`src/` 为核心与 XDB2 加载器，`cli/scws.c` 为 CLI。`dict/README.md` 描述词典流水线，`dict/FORMAT.md` 定义 XDB2 字节契约，`dict/sources.lock.json` 锁定上游。`tools/dict.py` 负责获取和加工，`tools/scws2-dict.c` 为纯 C 编译器；`tests/` 包含离线词典/核心集成测试及原生 C API 测试。
 
-旧引擎、字符集层、Autotools 构建及历史演示已移除；Git 历史和主分支保留 1.x 实现。`phpext/` 等待核心稳定后重写。`etc/rules.ini`、`etc/rules_cht.ini` 均为 UTF-8，暂不执行旧 INI 规则。不要修改另一个 worktree 或清理用户原有文件。
+旧引擎、字符集层、Autotools 构建及历史演示已移除；Git 历史和主分支保留 1.x 实现。`phpext/` 等待核心稳定后重写。`etc/rules.ini`、`etc/rules_cht.ini` 均为 UTF-8，仅维护符号、数字及单位，契约见 `etc/README.md`。不要修改另一个 worktree 或清理用户原有文件。
 
 ## 开发与验证
 
 ```sh
 make -j2
 make check
+make rules # 修改 etc/rules*.ini 后重新生成 C 表，再 make
 python3 tools/dict.py fetch
 python3 tools/dict.py build
 python3 tools/dict.py check build/dict/dictionary.xdb
@@ -29,7 +30,7 @@ build/scws -d build/dict/dictionary.xdb --search -i '中文分词测试'
 
 C11 使用 Tab 缩进和 `snake_case`；Python 使用四空格和标准库。没有额外格式化工具。文件格式采用显式 little-endian 编码，不直接写 C 结构体。新格式变更同步文档、校验器和测试。对源数据、来源许可和人工修订保持追踪，禁止直接合并不同口径的频率或引入 IDF。核心行为变化须用真实切分或检索案例验证。
 
-词性作为最多两个 ASCII 字符的可选元数据保留在加工词表和 XDB2 中，未知值为空，不参与评分。jieba `nrt`、`nrfg` 显式映射为 `nr`；未定义的长标签报错，禁止直接截断。旧 `rules.ini` 词性规则的设计尚未确定，不因保留标签而自动迁移或启用。
+词性作为最多两个 ASCII 字符的可选元数据保留在加工词表和 XDB2 中，未知值为空，不参与评分。jieba `nrt`、`nrfg` 显式映射为 `nr`；未定义的长标签报错，禁止直接截断。姓名、地名、词性倍率规则已决定移除，不自动恢复。数字规则只处理明确形式，不强行猜测范围、约数或词义。规则数据变更须重新生成并提交 `src/rules_data.h`；运行时不读取 INI。
 
 ## 提交与交付
 
