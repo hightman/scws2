@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "source": {
+    "id": "jieba",
+    "repository": "https://github.com/fxsjy/jieba",
+    "revision": "67fa2e36e72f69d9134b8a1037b83fbb070b9775",
+    "license": "MIT",
+    "parser": "jieba-v1",
+    "files": [
+      {
+        "path": "jieba/dict.txt",
+        "cache_name": "jieba-dict.txt",
+        "url": "https://raw.githubusercontent.com/fxsjy/jieba/67fa2e36e72f69d9134b8a1037b83fbb070b9775/jieba/dict.txt",
+        "sha256": "7197c3211ddd98962b036cdf40324d1ea2bfaa12bd028e68faa70111a88e12a8",
+        "bytes": 5071852
+      },
+      {
+        "path": "LICENSE",
+        "cache_name": "jieba-LICENSE",
+        "url": "https://raw.githubusercontent.com/fxsjy/jieba/67fa2e36e72f69d9134b8a1037b83fbb070b9775/LICENSE",
+        "sha256": "18ba0984839f85853b29fadaf992f7dba8fd0ca0fbeae34de2b8735222dc7a37",
+        "bytes": 1075
+      }
+    ]
+  }
+}
