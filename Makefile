@@ -2,6 +2,8 @@ CC ?= cc
 AR ?= ar
 PYTHON ?= python3
 PREFIX ?= /usr/local
+CASES ?= tests/cases/segmentation.json
+CASE_DICT ?= build/dict/dictionary.xdb
 CFLAGS ?= -O2
 CPPFLAGS += -Iinclude -Isrc -Ibuild
 WARNINGS = -std=c11 -Wall -Wextra -Wpedantic -Werror
@@ -15,7 +17,7 @@ SHARED_FLAGS = -shared
 endif
 OBJECTS = build/scws.o build/utf8.o build/xdb.o build/rules.o
 
-.PHONY: all check test dict rules install clean
+.PHONY: all check test cases check-cases dict rules install clean
 all: build/libscws.a $(SHARED) build/scws build/scws2-dict
 
 build:
@@ -42,6 +44,13 @@ build/scws2-dict: cli/scws2-dict.c | build
 check test: all
 	$(PYTHON) -B tools/gen_rules.py --check
 	$(PYTHON) -B -m unittest discover -s tests -p 'test_*.py' -v
+
+# Observation allows differences; strict checks also track known defects.
+cases: build/scws
+	$(PYTHON) -B tools/check_segments.py --cases "$(CASES)" -d "$(CASE_DICT)" --observe
+
+check-cases: build/scws
+	$(PYTHON) -B tools/check_segments.py --cases "$(CASES)" -d "$(CASE_DICT)"
 
 rules:
 	$(PYTHON) -B tools/gen_rules.py --output build/rules_data.h

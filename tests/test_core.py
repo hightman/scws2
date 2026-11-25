@@ -1,5 +1,6 @@
 """Behavioral tests against the real C library, CLI and independent XDB builder."""
 import os
+import json
 from pathlib import Path
 import random
 import shlex
@@ -171,6 +172,68 @@ class CoreTests(unittest.TestCase):
             result = subprocess.run([str(self.api), str(self.root / 'missing.xdb'), mode, 'io'],
                                     capture_output=True, timeout=15)
             self.assertEqual(result.returncode, 0, result.stderr.decode())
+
+    def run_case_tool(self, cases, *options):
+        path = self.root / 'cases.json'
+        path.write_text(json.dumps({'cases': cases}, ensure_ascii=False), encoding='utf-8')
+        return subprocess.run([os.sys.executable, '-B', str(ROOT / 'tools/check_segments.py'),
+                               '--scws', str(self.cli), '-d', str(self.dictionary),
+                               '--cases', str(path), *options], capture_output=True, text=True, timeout=15)
+
+    def test_case_tool_displays_compares_and_filters(self):
+        cases = [
+            {'id': 'words', 'text': '中文 测试', 'expected': ['中文', '测试'], 'expected_pos': ['n', 'vn']},
+            {'id': 'search', 'text': '中文！', 'mode': 'search', 'symbols': True,
+             'expected': ['中文', '！'], 'expected_pos': ['n', 'un']},
+            {'id': 'empty', 'text': '', 'expected': []},
+            {'id': 'observe', 'text': '研究生命起源'}]
+        result = self.run_case_tool(cases)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('中文/n', result.stdout)
+        self.assertIn('主词:', result.stdout)
+        self.assertIn('符合预期 3；有差异 0；仅展示 1；执行错误 0', result.stdout)
+        cases += [
+            {'id': 'word-diff', 'text': '中文测试', 'expected': ['中文测试']},
+            {'id': 'pos-diff', 'text': '中文', 'expected': ['中文'], 'expected_pos': ['v']}]
+        result = self.run_case_tool(cases, '--case', 'word-diff', '--case', 'pos-diff')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('expected[0:1] 中文测试', result.stdout)
+        self.assertIn('原文字符范围 [0:2], [2:4]', result.stdout)
+        self.assertIn('词性 actual[1]', result.stdout)
+        self.assertIn('汇总: 2 句', result.stdout)
+        observed = self.run_case_tool(cases, '--case', 'word-diff', '--observe')
+        self.assertEqual(observed.returncode, 0, observed.stdout + observed.stderr)
+        self.assertIn('有差异 1', observed.stdout)
+
+    def test_case_tool_compares_primary_path_independently(self):
+        # Search can contain the requested word as a supplement while its
+        # primary path still differs. Do not let a full-output match hide it.
+        cases = [{'id': 'primary', 'text': '人工智能', 'mode': 'search',
+                  'expected': ['人工智能', '人工', '智能'],
+                  'expected_primary': ['人工', '智能']}]
+        result = self.run_case_tool(cases)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('expected_primary[0:2] 人工 | 智能', result.stdout)
+        cases[0]['expected_primary'] = ['人工智能']
+        result = self.run_case_tool(cases)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('符合预期 1', result.stdout)
+        cases[0]['expected'] = ['wrong']
+        result = self.run_case_tool(cases)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+    def test_case_tool_reports_config_and_execution_errors(self):
+        for cases, options in [([{'id': 'bad', 'text': '中文', 'mode': 'gbk'}], []),
+                               ([{'id': 'bad', 'text': '中文', 'expected_pos': ['n']}], []),
+                               ([{'id': 'ok', 'text': '中文'}], ['--case', 'missing'])]:
+            result = self.run_case_tool(cases, *options)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn('配置错误', result.stderr)
+        result = self.run_case_tool([{'id': 'one', 'text': '中文'}, {'id': 'two', 'text': '测试'}],
+                                    '-d', str(self.root / 'missing.xdb'))
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('汇总: 2 句', result.stdout)
+        self.assertIn('执行错误 2', result.stdout)
 
     def test_invalid_dictionary_framing_is_rejected(self):
         original = self.dictionary.read_bytes()

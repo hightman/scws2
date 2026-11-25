@@ -34,6 +34,17 @@ printf '南京市长江大桥\n' | build/scws -d build/dict/dictionary.xdb
 
 CLI 默认读取全部标准输入，以 TSV 输出字节跨度、字符跨度、词性、种类、来源和原词。`--search` 增加检索补词，`--bigrams` 可在搜索模式开启未知汉字二元兜底，`--symbols` 保留符号。
 
+## 分词用例对照
+
+```sh
+make cases                       # 逐句观察，有差异也正常结束
+make check-cases                 # 严格比较，有差异返回失败
+python3 tools/check_segments.py --case case-07-standard --case case-07-search
+```
+
+逐句显示输入、分词、词性与预期差异，支持自定义 JSON 用例和叠加词典。
+样例集中在 `tests/cases/`。每句分别验证 standard 和 search，预期以已接受的新版结果为准；第 7 句保留已知主路径缺陷，严格比较会报告失败。配置与退出码见 [用例说明](tests/cases/README.md)。
+
 ## 词典
 
 词典默认整库加载到内存；C API 可用 `scws_dict_open_ex(path, SCWS_DICT_MMAP, &dict)` 选择只读映射，契约见 [API.md](API.md)。映射模式不自动回退到内存加载。
