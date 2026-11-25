@@ -314,6 +314,6 @@ size_t scws_count(const scws *ctx) { return ctx ? ctx->count : 0; }
 const char *scws_strerror(scws_status status)
 {
 	static const char *const messages[] = {"success", "invalid argument", "out of memory", "I/O error",
-		"invalid dictionary format", "invalid UTF-8", "resource limit exceeded"};
+		"invalid dictionary format", "invalid UTF-8", "resource limit exceeded", "operation not supported"};
 	return (unsigned) status < sizeof(messages) / sizeof(messages[0]) ? messages[status] : "unknown error";
 }

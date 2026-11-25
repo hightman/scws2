@@ -1,12 +1,21 @@
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
 #include "xdb.h"
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#if !defined(SCWS_NO_MMAP) && (defined(__unix__) || defined(__APPLE__))
+#define SCWS_HAVE_MMAP 1
+#include <sys/mman.h>
+#endif
+
 #define HEADER 64u
 #define TRAILER 8u
 #define MAX_DICTIONARY_BYTES (512u * 1024u * 1024u)
-struct scws_dict { unsigned char *data; uint32_t size, buckets, base; };
+struct scws_dict { unsigned char *data; uint32_t size, buckets, base; scws_dict_mode mode; };
 
 static uint32_t u32(const unsigned char *p)
 {
@@ -76,27 +85,48 @@ static scws_status validate(scws_dict *dict)
 
 scws_status scws_dict_open(const char *path, scws_dict **out)
 {
+	return scws_dict_open_ex(path, SCWS_DICT_MEMORY, out);
+}
+scws_status scws_dict_open_ex(const char *path, scws_dict_mode mode, scws_dict **out)
+{
 	FILE *fp;
 	long length;
 	scws_dict *dict;
 	scws_status status;
 	if (!out) return SCWS_EINVAL;
 	*out = NULL;
-	if (!path) return SCWS_EINVAL;
+	if (!path || (mode != SCWS_DICT_MEMORY && mode != SCWS_DICT_MMAP)) return SCWS_EINVAL;
+#ifndef SCWS_HAVE_MMAP
+	if (mode == SCWS_DICT_MMAP) return SCWS_ENOTSUP;
+#endif
 	fp = fopen(path, "rb");
 	if (!fp) return SCWS_EIO;
 	if (fseek(fp, 0, SEEK_END) || (length = ftell(fp)) < 0 || fseek(fp, 0, SEEK_SET)) {
 		fclose(fp); return SCWS_EIO;
 	}
-	if (length < (long) HEADER || (unsigned long) length > MAX_DICTIONARY_BYTES) {
-		fclose(fp); return length < (long) HEADER ? SCWS_EFORMAT : SCWS_ELIMIT;
+	if (length < (long) (HEADER + TRAILER) || (unsigned long) length > MAX_DICTIONARY_BYTES) {
+		fclose(fp); return length < (long) (HEADER + TRAILER) ? SCWS_EFORMAT : SCWS_ELIMIT;
 	}
 	dict = calloc(1, sizeof(*dict));
 	if (!dict) { fclose(fp); return SCWS_ENOMEM; }
 	dict->size = (uint32_t) length;
-	dict->data = malloc(dict->size);
-	if (!dict->data) { fclose(fp); free(dict); return SCWS_ENOMEM; }
-	status = fread(dict->data, 1, dict->size, fp) == dict->size ? SCWS_OK : SCWS_EIO;
+	dict->mode = mode;
+#ifdef SCWS_HAVE_MMAP
+	if (mode == SCWS_DICT_MMAP) {
+		void *mapping = mmap(NULL, dict->size, PROT_READ, MAP_SHARED, fileno(fp), 0);
+		if (mapping == MAP_FAILED) {
+			status = errno == ENOMEM ? SCWS_ENOMEM : SCWS_EIO;
+			fclose(fp); free(dict); return status;
+		}
+		dict->data = mapping;
+		status = SCWS_OK;
+	} else
+#endif
+	{
+		dict->data = malloc(dict->size);
+		if (!dict->data) { fclose(fp); free(dict); return SCWS_ENOMEM; }
+		status = fread(dict->data, 1, dict->size, fp) == dict->size ? SCWS_OK : SCWS_EIO;
+	}
 	if (fclose(fp)) status = SCWS_EIO;
 	if (!status) status = validate(dict);
 	if (status) { scws_dict_close(dict); return status; }
@@ -105,5 +135,11 @@ scws_status scws_dict_open(const char *path, scws_dict **out)
 }
 void scws_dict_close(scws_dict *dict)
 {
-	if (dict) { free(dict->data); free(dict); }
+	if (!dict) return;
+#ifdef SCWS_HAVE_MMAP
+	if (dict->mode == SCWS_DICT_MMAP) munmap(dict->data, dict->size);
+	else
+#endif
+		free(dict->data);
+	free(dict);
 }

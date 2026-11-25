@@ -12,8 +12,9 @@ typedef struct scws_dict scws_dict;
 typedef struct scws scws;
 typedef enum {
 	SCWS_OK = 0, SCWS_EINVAL, SCWS_ENOMEM, SCWS_EIO, SCWS_EFORMAT,
-	SCWS_EUTF8, SCWS_ELIMIT
+	SCWS_EUTF8, SCWS_ELIMIT, SCWS_ENOTSUP
 } scws_status;
+typedef enum { SCWS_DICT_MEMORY = 0, SCWS_DICT_MMAP = 1 } scws_dict_mode;
 typedef enum { SCWS_STANDARD = 0, SCWS_SEARCH = 1 } scws_mode;
 typedef enum { SCWS_PRIMARY = 0, SCWS_SECONDARY = 1, SCWS_FALLBACK = 2 } scws_kind;
 typedef enum { SCWS_DICTIONARY = 0, SCWS_BUILTIN = 1, SCWS_UNKNOWN = 2 } scws_origin;
@@ -27,9 +28,13 @@ typedef struct {
 	scws_origin origin;
 } scws_token;
 
-/* Dictionaries are immutable after validation and may be shared by threads.
+/* Dictionaries are immutable after opening and may be shared by threads.
  * Close them only after all contexts using them have been freed. */
+/* Default is a private, fully read memory buffer. */
 scws_status scws_dict_open(const char *path, scws_dict **out);
+/* MMAP is read-only and never silently falls back to MEMORY. The mapped file
+ * must remain unchanged until close; deploy updates by replacing the file. */
+scws_status scws_dict_open_ex(const char *path, scws_dict_mode mode, scws_dict **out);
 void scws_dict_close(scws_dict *dict);
 scws_status scws_new(const scws_dict *dict, scws **out);
 void scws_free(scws *ctx);

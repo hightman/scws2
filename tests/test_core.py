@@ -19,6 +19,7 @@ class CoreTests(unittest.TestCase):
         cls.cli = cls.root / 'scws'
         cls.compiler = cls.root / 'scws2-dict'
         cls.api = cls.root / 'api-test'
+        cls.no_mmap_api = cls.root / 'api-no-mmap-test'
         subprocess.run([os.sys.executable, '-B', str(ROOT / 'tools/gen_rules.py'),
                         '--output', str(cls.root / 'rules_data.h')], check=True)
         cc = shlex.split(os.environ.get('CC', 'cc'))
@@ -27,6 +28,8 @@ class CoreTests(unittest.TestCase):
         includes = ['-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src'), '-I' + str(cls.root)]
         for main, output, extra in [('cli/scws.c', cls.cli, []), ('tests/core_api.c', cls.api, ['-pthread'])]:
             subprocess.run(cc + flags + includes + source + [str(ROOT / main), '-o', str(output)] + extra, check=True)
+        subprocess.run(cc + flags + includes + ['-DSCWS_NO_MMAP'] + source
+                       + [str(ROOT / 'tests/core_api.c'), '-pthread', '-o', str(cls.no_mmap_api)], check=True)
         subprocess.run(cc + flags + [str(ROOT / 'cli/scws2-dict.c'), '-o', str(cls.compiler)], check=True)
         cls.dictionary = cls.build('base', [
             ('研究', 100, 3, 'v'), ('研究生', 50, 3, 'n'), ('生命', 100, 3, 'n'),
@@ -147,8 +150,27 @@ class CoreTests(unittest.TestCase):
         self.assertEqual((token['length'], token['char_length']), (100000, 100000))
 
     def test_native_api_lifecycle_errors_and_shared_dictionary(self):
-        result = subprocess.run([str(self.api), str(self.dictionary)], capture_output=True, timeout=15)
+        result = subprocess.run([str(self.api), str(self.dictionary), str(self.overlay)], capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr.decode())
+
+    def test_memory_only_build_reports_mmap_unsupported(self):
+        result = subprocess.run([str(self.no_mmap_api), str(self.dictionary), str(self.overlay)],
+                                capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
+
+    def test_mapped_dictionary_survives_atomic_file_replacement(self):
+        path, replacement = self.root / 'live.xdb', self.root / 'replacement.xdb'
+        path.write_bytes(self.dictionary.read_bytes())
+        replacement.write_bytes(self.overlay.read_bytes())
+        result = subprocess.run([str(self.api), str(path), 'replace', str(replacement)],
+                                capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
+
+    def test_loading_modes_report_io_errors(self):
+        for mode in ('memory', 'mmap'):
+            result = subprocess.run([str(self.api), str(self.root / 'missing.xdb'), mode, 'io'],
+                                    capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
 
     def test_invalid_dictionary_framing_is_rejected(self):
         original = self.dictionary.read_bytes()
@@ -166,6 +188,10 @@ class CoreTests(unittest.TestCase):
                 path = self.root / 'invalid.xdb'
                 path.write_bytes(raw)
                 self.invoke('中文', dictionary=path, success=False)
+                for mode in ('memory', 'mmap'):
+                    result = subprocess.run([str(self.api), str(path), mode, 'format'],
+                                            capture_output=True, timeout=15)
+                    self.assertEqual(result.returncode, 0, result.stderr.decode())
 
     def test_open_does_not_scan_dictionary_records(self):
         original = bytearray(self.dictionary.read_bytes())

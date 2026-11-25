@@ -36,6 +36,8 @@ CLI 默认读取全部标准输入，以 TSV 输出字节跨度、字符跨度�
 
 ## 词典
 
+词典默认整库加载到内存；C API 可用 `scws_dict_open_ex(path, SCWS_DICT_MMAP, &dict)` 选择只读映射，契约见 [API.md](API.md)。映射模式不自动回退到内存加载。
+
 当前唯一接入的上游是 jieba 标准词典，THUOCL 尚未融入。词性最多两个 ASCII 字符，`nrt`、`nrfg` 在加工时归并为 `nr`，缺失时为空；词性不参与切分评分。
 
 来源锁定、加工、许可及使用限制见 [dict/README.md](dict/README.md)，文件格式见 [dict/FORMAT.md](dict/FORMAT.md)。可单独运行词典测试：
