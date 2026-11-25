@@ -25,8 +25,9 @@ static size_t segment(scws_t ctx, const sentence *line, int dump)
 {
 	size_t count = 0;
 	const scws_token_t *token;
-	if (scws_segment(ctx, line->text, line->size, output_mode)) fail("segmentation failed");
-	while ((token = scws_next(ctx)) != NULL) {
+	scws_result_t result = scws_segment(ctx, line->text, line->size, output_mode);
+	if (!result) fail(scws_strerror(ctx));
+	while ((token = scws_result_next(result)) != NULL) {
 		if (dump) {
 			if (count) putchar(' ');
 			if (dump == 2) printf("%zu:%zu", token->offset, token->length);
@@ -34,6 +35,7 @@ static size_t segment(scws_t ctx, const sentence *line, int dump)
 		}
 		count++;
 	}
+	scws_result_free(result);
 	if (dump) putchar('\n');
 	return count;
 }

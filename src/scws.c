@@ -16,11 +16,19 @@ typedef struct {
 struct scws {
 	scws_dict_t **dicts;
 	size_t dict_count, dict_capacity;
-	scws_token_t *tokens;
-	size_t count, capacity, cursor;
 	unsigned flags;
 	uint32_t unknown_cost;
+	scws_status_t error;
 };
+struct scws_result {
+	scws_token_t *tokens;
+	size_t count, capacity, cursor;
+};
+static scws_status_t set_error(scws_t ctx, scws_status_t error)
+{
+	if (ctx) ctx->error = error;
+	return error;
+}
 
 static scws_status_t reserve(void *array, size_t *capacity, size_t need, size_t width, void **out)
 {
@@ -64,11 +72,11 @@ static scws_status_t load_dict(scws_t ctx, const char *filename, scws_dict_mode_
 }
 scws_status_t scws_set_dict(scws_t ctx, const char *filename, scws_dict_mode_t mode)
 {
-	return load_dict(ctx, filename, mode, 1);
+	return set_error(ctx, load_dict(ctx, filename, mode, 1));
 }
 scws_status_t scws_add_dict(scws_t ctx, const char *filename, scws_dict_mode_t mode)
 {
-	return load_dict(ctx, filename, mode, 0);
+	return set_error(ctx, load_dict(ctx, filename, mode, 0));
 }
 scws_t scws_new(void)
 {
@@ -80,19 +88,19 @@ void scws_free(scws_t ctx)
 {
 	if (!ctx) return;
 	clear_dicts(ctx);
-	free(ctx->dicts); free(ctx->tokens); free(ctx);
+	free(ctx->dicts); free(ctx);
 }
 scws_status_t scws_set_options(scws_t ctx, unsigned flags)
 {
-	if (!ctx || flags & ~(SCWS_KEEP_SYMBOLS | SCWS_FALLBACK_BIGRAM)) return SCWS_EINVAL;
+	if (!ctx || flags & ~(SCWS_KEEP_SYMBOLS | SCWS_FALLBACK_BIGRAM)) return set_error(ctx, SCWS_EINVAL);
 	ctx->flags = flags;
-	return SCWS_OK;
+	return set_error(ctx, SCWS_OK);
 }
 scws_status_t scws_set_unknown_cost(scws_t ctx, uint32_t cost)
 {
-	if (!ctx || !cost) return SCWS_EINVAL;
+	if (!ctx || !cost) return set_error(ctx, SCWS_EINVAL);
 	ctx->unknown_cost = cost;
-	return SCWS_OK;
+	return set_error(ctx, SCWS_OK);
 }
 
 static int alnum(uint32_t ch) { return scws_alpha(ch) || scws_digit(ch); }
@@ -158,17 +166,17 @@ static void consider(path *paths, size_t from, size_t to, uint32_t cost, int emi
 		strcpy(current->pos, pos);
 	}
 }
-static scws_status_t append(scws_t ctx, const unit *units, size_t from, size_t to,
+static scws_status_t append(scws_result_t result, const unit *units, size_t from, size_t to,
 	const char *pos, scws_kind_t kind, scws_origin_t origin)
 {
 	scws_status_t status;
 	scws_token_t *token;
 	void *grown;
-	if (ctx->count == SIZE_MAX) return SCWS_ELIMIT;
-	status = reserve(ctx->tokens, &ctx->capacity, ctx->count + 1, sizeof(*ctx->tokens), &grown);
+	if (result->count == SIZE_MAX) return SCWS_ELIMIT;
+	status = reserve(result->tokens, &result->capacity, result->count + 1, sizeof(*result->tokens), &grown);
 	if (status) return status;
-	ctx->tokens = grown;
-	token = &ctx->tokens[ctx->count++];
+	result->tokens = grown;
+	token = &result->tokens[result->count++];
 	token->offset = units[from].offset;
 	token->length = units[to].offset - units[from].offset;
 	token->char_offset = from; token->char_length = to - from;
@@ -185,27 +193,33 @@ static int token_compare(const void *left, const void *right)
 	return a->origin < b->origin ? -1 : a->origin > b->origin;
 }
 
-scws_status_t scws_segment(scws_t ctx, const char *input, size_t length, scws_mode_t mode)
+scws_result_t scws_segment(scws_t ctx, const char *input, size_t length, scws_mode_t mode)
 {
 	const unsigned char *text = (const unsigned char *) input;
 	unit *units = NULL;
 	path *paths = NULL;
 	unsigned char *unknown = NULL;
+	scws_result_t result = NULL;
 	size_t count = 0, offset = 0;
 	scws_status_t status = SCWS_OK;
-	if (!ctx) return SCWS_EINVAL;
-	ctx->count = ctx->cursor = 0;
-	if ((!input && length) || (mode != SCWS_STANDARD && mode != SCWS_SEARCH)) return SCWS_EINVAL;
-	if (!length) return SCWS_OK;
+	if (!ctx) return NULL;
+	if ((!input && length) || (mode != SCWS_STANDARD && mode != SCWS_SEARCH)) {
+		set_error(ctx, SCWS_EINVAL); return NULL;
+	}
 	/* Counts also bound cost accumulation and all size multiplications. */
 	if (length > SIZE_MAX / sizeof(unit) - 1 || length > SIZE_MAX / sizeof(path) - 1
-		|| length > UINT64_MAX / UINT32_MAX - 1) return SCWS_ELIMIT;
+		|| length > UINT64_MAX / UINT32_MAX - 1) {
+		set_error(ctx, SCWS_ELIMIT); return NULL;
+	}
 	while (offset < length) {
 		uint32_t ch;
 		size_t size = scws_utf8_decode(text + offset, length - offset, &ch);
-		if (!size) return SCWS_EUTF8;
+		if (!size) { status = SCWS_EUTF8; goto done; }
 		offset += size; count++;
 	}
+	result = calloc(1, sizeof(*result));
+	if (!result) { status = SCWS_ENOMEM; goto done; }
+	if (!length) goto done;
 	units = calloc(count + 1, sizeof(*units));
 	paths = calloc(count + 1, sizeof(*paths));
 	unknown = calloc(count, 1);
@@ -247,13 +261,13 @@ scws_status_t scws_segment(scws_t ctx, const char *input, size_t length, scws_mo
 		if (units[i].number_to && (choice->to == units[i].number_to || choice->to == units[i].quantity_to))
 			for (size_t j = i; j < choice->to; j++) units[j].numeric_owner = i + 1;
 		if (choice->emit) {
-			status = append(ctx, units, i, choice->to, choice->pos, SCWS_PRIMARY, choice->origin);
+			status = append(result, units, i, choice->to, choice->pos, SCWS_PRIMARY, choice->origin);
 			if (status) goto done;
 			if (choice->origin == SCWS_UNKNOWN && choice->to == i + 1 && scws_han(units[i].ch)) unknown[i] = 1;
 		}
 	}
 	if (mode == SCWS_SEARCH) {
-		size_t primary_count = ctx->count;
+		size_t primary_count = result->count;
 		for (size_t i = 0; i < count; i++) {
 			size_t owner = units[i].numeric_owner;
 			int mixed = 0;
@@ -272,28 +286,28 @@ scws_status_t scws_segment(scws_t ctx, const char *input, size_t length, scws_mo
 						|| (i == number->number_to && j + 1 == end);
 				}
 				if (lookup(ctx, text + units[i].offset, bytes, &word) && j > i && allowed) {
-					status = append(ctx, units, i, j + 1, word.pos, SCWS_SECONDARY, SCWS_DICTIONARY);
+					status = append(result, units, i, j + 1, word.pos, SCWS_SECONDARY, SCWS_DICTIONARY);
 					if (status) goto done;
 				}
 				if (!(word.flags & SCWS_WORD_PREFIX)) break;
 			}
 			if (i + 1 < count && unknown[i] && unknown[i + 1] && (ctx->flags & SCWS_FALLBACK_BIGRAM)) {
-				status = append(ctx, units, i, i + 2, "", SCWS_FALLBACK, SCWS_UNKNOWN);
+				status = append(result, units, i, i + 2, "", SCWS_FALLBACK, SCWS_UNKNOWN);
 				if (status) goto done;
 			}
 		}
 		for (size_t t = 0; t < primary_count; t++) {
-			/* append can realloc ctx->tokens, so copy all needed fields first. */
-			scws_token_t token = ctx->tokens[t];
+			/* append can realloc result->tokens, so copy all needed fields first. */
+			scws_token_t token = result->tokens[t];
 			size_t end = token.char_offset + token.char_length;
 			const unit *first = &units[token.char_offset];
 			if (first->number_to && (end == first->number_to || end == first->quantity_to)) {
 				if (first->number_from != token.char_offset || first->number_to != end) {
-					status = append(ctx, units, first->number_from, first->number_to, "m", SCWS_SECONDARY, SCWS_BUILTIN);
+					status = append(result, units, first->number_from, first->number_to, "m", SCWS_SECONDARY, SCWS_BUILTIN);
 					if (status) goto done;
 				}
 				if (end > first->number_to) {
-					status = append(ctx, units, first->number_to, end, "q", SCWS_SECONDARY, SCWS_BUILTIN);
+					status = append(result, units, first->number_to, end, "q", SCWS_SECONDARY, SCWS_BUILTIN);
 					if (status) goto done;
 				}
 				continue;
@@ -305,34 +319,41 @@ scws_status_t scws_segment(scws_t ctx, const char *input, size_t length, scws_mo
 				if (!alpha && !digit) continue;
 				while (j < end && (alpha ? scws_alpha(units[j].ch) : scws_digit(units[j].ch))) j++;
 				if (i == token.char_offset && j == end) continue;
-				status = append(ctx, units, i, j, alpha ? "en" : "m", SCWS_SECONDARY, SCWS_BUILTIN);
+				status = append(result, units, i, j, alpha ? "en" : "m", SCWS_SECONDARY, SCWS_BUILTIN);
 				if (status) goto done;
 			}
 		}
 	}
-	if (ctx->count > 1) {
+	if (result->count > 1) {
 		size_t used = 0;
-		qsort(ctx->tokens, ctx->count, sizeof(*ctx->tokens), token_compare);
-		for (size_t i = 0; i < ctx->count; i++) {
-			if (used && ctx->tokens[used - 1].offset == ctx->tokens[i].offset
-				&& ctx->tokens[used - 1].length == ctx->tokens[i].length) continue;
-			ctx->tokens[used++] = ctx->tokens[i];
+		qsort(result->tokens, result->count, sizeof(*result->tokens), token_compare);
+		for (size_t i = 0; i < result->count; i++) {
+			if (used && result->tokens[used - 1].offset == result->tokens[i].offset
+				&& result->tokens[used - 1].length == result->tokens[i].length) continue;
+			result->tokens[used++] = result->tokens[i];
 		}
-		ctx->count = used;
+		result->count = used;
 	}
 done:
 	free(units); free(paths); free(unknown);
-	if (status) ctx->count = ctx->cursor = 0;
-	return status;
+	if (status) { scws_result_free(result); result = NULL; }
+	set_error(ctx, status);
+	return result;
 }
-const scws_token_t *scws_next(scws_t ctx)
+const scws_token_t *scws_result_next(scws_result_t result)
 {
-	return ctx && ctx->cursor < ctx->count ? &ctx->tokens[ctx->cursor++] : NULL;
+	return result && result->cursor < result->count ? &result->tokens[result->cursor++] : NULL;
 }
-size_t scws_count(scws_t ctx) { return ctx ? ctx->count : 0; }
-const char *scws_strerror(scws_status_t status)
+size_t scws_result_count(scws_result_t result) { return result ? result->count : 0; }
+void scws_result_free(scws_result_t result)
+{
+	if (result) { free(result->tokens); free(result); }
+}
+scws_status_t scws_error_code(scws_t ctx) { return ctx ? ctx->error : SCWS_EINVAL; }
+const char *scws_strerror(scws_t ctx)
 {
 	static const char *const messages[] = {"success", "invalid argument", "out of memory", "I/O error",
 		"invalid dictionary format", "invalid UTF-8", "resource limit exceeded", "operation not supported"};
+	scws_status_t status = scws_error_code(ctx);
 	return (unsigned) status < sizeof(messages) / sizeof(messages[0]) ? messages[status] : "unknown error";
 }

@@ -12,6 +12,7 @@ static void usage(FILE *fp)
 int main(int argc, char **argv)
 {
 	scws_t ctx = scws_new();
+	scws_result_t tokens = NULL;
 	size_t length = 0;
 	unsigned flags = 0;
 	scws_mode_t mode = SCWS_STANDARD;
@@ -29,7 +30,7 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[i], "-i") && i + 1 < argc) input = argv[++i];
 		else if (!strcmp(argv[i], "-d") && i + 1 < argc) {
 			status = scws_add_dict(ctx, argv[++i], SCWS_DICT_MEMORY);
-			if (status) { fprintf(stderr, "%s: %s\n", argv[i], scws_strerror(status)); goto done; }
+			if (status) { fprintf(stderr, "%s: %s\n", argv[i], scws_strerror(ctx)); goto done; }
 		} else { usage(stderr); goto done; }
 	}
 	status = scws_set_options(ctx, flags);
@@ -55,9 +56,9 @@ int main(int argc, char **argv)
 		}
 		input = owned;
 	}
-	status = scws_segment(ctx, input, length, mode);
-	if (status) goto done;
-	for (const scws_token_t *token; (token = scws_next(ctx)) != NULL;) {
+	tokens = scws_segment(ctx, input, length, mode);
+	if (!tokens) { status = scws_error_code(ctx); goto done; }
+	for (const scws_token_t *token; (token = scws_result_next(tokens)) != NULL;) {
 		static const char *const kinds[] = {"primary", "secondary", "fallback"};
 		static const char *const origins[] = {"dictionary", "builtin", "unknown"};
 		printf("%zu\t%zu\t%zu\t%zu\t%s\t%s\t%s\t", token->offset, token->length,
@@ -69,7 +70,12 @@ int main(int argc, char **argv)
 	if (fflush(stdout)) { status = SCWS_EIO; goto done; }
 	result = EXIT_SUCCESS;
 done:
-	if (status) fprintf(stderr, "scws: %s\n", scws_strerror(status));
+	if (status) {
+		const char *message = ctx && scws_error_code(ctx) != SCWS_OK ? scws_strerror(ctx)
+			: status == SCWS_ENOMEM ? "out of memory" : status == SCWS_EIO ? "I/O error" : "resource limit exceeded";
+		fprintf(stderr, "scws: %s\n", message);
+	}
+	scws_result_free(tokens);
 	scws_free(ctx);
 	free(owned);
 	return result;

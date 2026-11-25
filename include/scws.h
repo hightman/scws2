@@ -9,6 +9,7 @@ extern "C" {
 
 #define SCWS_VERSION "2.0.0-dev"
 typedef struct scws *scws_t;
+typedef struct scws_result *scws_result_t;
 typedef enum {
 	SCWS_OK = 0, SCWS_EINVAL, SCWS_ENOMEM, SCWS_EIO, SCWS_EFORMAT,
 	SCWS_EUTF8, SCWS_ELIMIT, SCWS_ENOTSUP
@@ -29,7 +30,7 @@ typedef struct {
 
 /* NULL on allocation failure; starts with built-in rules and no dictionary. */
 scws_t scws_new(void);
-/* Frees the context, its dictionaries and results; NULL is accepted. */
+/* Frees the context and its dictionaries, not returned results; NULL is accepted. */
 void scws_free(scws_t ctx);
 /* Replace all dictionaries, or append an overlay. The context owns all loaded
  * data. Failure preserves the existing dictionaries. MEMORY is the default
@@ -40,14 +41,20 @@ scws_status_t scws_add_dict(scws_t ctx, const char *path, scws_dict_mode_t mode)
 scws_status_t scws_set_options(scws_t ctx, unsigned flags);
 /* Advanced tuning only: cost must be nonzero; normally keep the default. */
 scws_status_t scws_set_unknown_cost(scws_t ctx, uint32_t cost);
-/* Input is length-delimited; embedded NULs are separators. Invalid UTF-8
- * fails the entire call, clears previous results and never returns partial text.
- * The input is not retained. A context must not be used concurrently. */
-scws_status_t scws_segment(scws_t ctx, const char *text, size_t length, scws_mode_t mode);
-/* Result storage belongs to the context until the next segment call or free. */
-const scws_token_t *scws_next(scws_t ctx);
-size_t scws_count(scws_t ctx);
-const char *scws_strerror(scws_status_t status);
+/* Returns an independently owned result (including for empty input), or NULL
+ * on error. Input is length-delimited UTF-8, may contain NUL separators, and is
+ * not retained. Prior results survive later calls, errors and context free.
+ * A context must not be used concurrently. */
+scws_result_t scws_segment(scws_t ctx, const char *text, size_t length, scws_mode_t mode);
+/* Token pointers live until result_free. NULL means end, not an error. */
+const scws_token_t *scws_result_next(scws_result_t result);
+/* Total count, not remaining count; NULL result returns 0. */
+size_t scws_result_count(scws_result_t result);
+void scws_result_free(scws_result_t result);
+/* Context operations replace the last error; success clears it. Queries and
+ * result operations do not change it. NULL context reports SCWS_EINVAL. */
+scws_status_t scws_error_code(scws_t ctx);
+const char *scws_strerror(scws_t ctx);
 
 #ifdef __cplusplus
 }

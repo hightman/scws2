@@ -185,8 +185,12 @@ def main(argv=None):
     configurations = [('scws-2-standard-memory', 'memory', 'standard'),
                       ('scws-2-standard-mmap', 'mmap', 'standard'),
                       ('scws-2-search-memory', 'memory', 'search')]
+    source_files = sorted([ROOT / 'include/scws.h', ROOT / 'tools/bench_scws.c', ROOT / 'tools/gen_rules.py',
+                           *list((ROOT / 'src').glob('*.c')), *list((ROOT / 'src').glob('*.h'))])
     report = {'timestamp_utc': datetime.now(timezone.utc).isoformat(), 'machine': machine_info(cc),
               'current_revision': git('rev-parse', 'HEAD').decode().strip(),
+              'source_sha256': {str(path.relative_to(ROOT)): sha(path.read_bytes()) for path in source_files},
+              'source_modified': bool(git('status', '--porcelain', '--', *[str(path.relative_to(ROOT)) for path in source_files])),
               'corpus': {'source': corpus_source, 'source_sha256': sha(original),
                          'sentences': len(gold), 'gold_words': sum(map(len, gold)),
                          'characters': sum(map(len, text)), 'utf8_bytes_without_newlines': sum(len(s.encode()) for s in text)},

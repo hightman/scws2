@@ -8,8 +8,8 @@
 
 | 测试集 | Precision | Recall | F1 | memory 吞吐 MiB/s | mmap 吞吐 MiB/s |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| PKU | 88.37% | 82.01% | 85.08% | 12.03 | 13.17 |
-| MSR | 86.70% | 84.26% | 85.46% | 13.85 | 13.57 |
+| PKU | 88.37% | 82.01% | 85.08% | 11.78 | 11.35 |
+| MSR | 86.70% | 84.26% | 85.46% | 13.31 | 13.42 |
 
 速度为单线程、热缓存、7 轮交错计时中位数，排除词典加载、语料读取和输出；本机负载会影响数值。search 输出重叠补词，不套用唯一切分的 F1，速度及详细记录见 [评测说明](tests/evaluation/README.md)。
 
@@ -62,7 +62,7 @@ python3 tools/check_segments.py --case case-07-standard --case case-07-search
 
 ## 词典
 
-词典默认整库加载到内存；C API 先用 `scws_t ctx = scws_new()` 创建上下文，再用 `scws_set_dict(ctx, path, SCWS_DICT_MEMORY)` 加载词典，或传 `SCWS_DICT_MMAP` 选择只读映射；`scws_free(ctx)` 统一释放，契约见 [API.md](API.md)。映射模式不自动回退到内存加载。
+词典默认整库加载到内存；C API 先用 `scws_t ctx = scws_new()` 创建上下文，再用 `scws_set_dict(ctx, path, SCWS_DICT_MEMORY)` 加载词典，或传 `SCWS_DICT_MMAP` 选择只读映射；`scws_free(ctx)` 统一释放词典和上下文。`scws_segment()` 返回独立的 `scws_result_t`，用 `scws_result_next()` 遍历、`scws_result_free()` 释放，可嵌套分词；结果在 ctx 释放后仍有效。契约见 [API.md](API.md)。映射模式不自动回退到内存加载。
 
 当前唯一接入的上游是 jieba 标准词典，THUOCL 尚未融入。词性最多两个 ASCII 字符，`nrt`、`nrfg` 在加工时归并为 `nr`，缺失时为空；词性不参与切分评分。
 

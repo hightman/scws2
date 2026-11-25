@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-11-25T09:34:48.687254+00:00",
+  "timestamp_utc": "2026-11-25T12:31:26.091373+00:00",
   "machine": {
     "system": "Darwin",
     "release": "27.2.1",
@@ -10,7 +10,20 @@
     "optimization": "-O2",
     "threads": 1
   },
-  "current_revision": "7c5572e2dece466053a4ae506ed97c43ee110373",
+  "current_revision": "ef90cee81e64c2173d8276a736ae6032faae9359",
+  "source_sha256": {
+    "include/scws.h": "6818e559554a6ab878a24b429d1e8a9e8e7f525731d75194bf1a32816d36783d",
+    "src/rules.c": "d54a698f8722658c0a0ac604998b57551c326c477250236fdcea4208547ceb8b",
+    "src/rules.h": "0748bbc7d72f0f55e5e8afa6e25de4c20fccc7520f09600e180d1ac991e47a54",
+    "src/scws.c": "8af61cd02a58b072045d0cc596611ccedfc3963c44583f90f38afdcefcfabb61",
+    "src/utf8.c": "73939201241557afbfd60a6e43925508fbe730a77fab34c6f7dbe2ae8af49c41",
+    "src/utf8.h": "c29f59ffd0be778e07a49f88dac49febef6fded18e36ff64e9245327017b2ceb",
+    "src/xdb.c": "9e8fb034a969a55aae122f4747a1e454d12fce0adc24bbb4f88447afa6ad998e",
+    "src/xdb.h": "cb8648736029b04589398fd13032a7d98df313ae0726d2fcce3f3b88e8c4719c",
+    "tools/bench_scws.c": "397f9fa61cb34c60cad5093b81f2658baa5c4e0ea6c6bf18f4c9a2fb6e87537f",
+    "tools/gen_rules.py": "d834c703e3cc1a30e54918d3503df198e54ebf4bc5b74e5d38db208e6eed3408"
+  },
+  "source_modified": true,
   "corpus": {
     "source": "https://raw.githubusercontent.com/yuikns/icwb2-data/873a51fa6234c644126d2f2c5c603a97809d2e49/gold/msr_test_gold.utf8",
     "source_sha256": "cd1a8473841f1b2fcddd14d12599ad8872e6167feb64807af5bac2f6a32cb75d",
@@ -18,6 +31,10 @@
     "gold_words": 106873,
     "characters": 184355,
     "utf8_bytes_without_newlines": 552251
+  },
+  "dictionary": {
+    "sha256": "af9e223bb26f5474b81c236dea3592dcaf96659d32865ace39455db18ee25d9c",
+    "bytes": 17854132
   },
   "rules_sha256": "f97da443f832bed89e3c46677795d69d147543186f051f069fdd73e6d41d8330",
   "timing_protocol": "7 interleaved shuffled rounds (seed=0); warm cache; native single thread; median",
@@ -34,28 +51,28 @@
         "overlapping_sentences": 0,
         "uncovered_characters": 0
       },
+      "tokens_per_pass": 103858,
       "sighan_report": "=== SUMMARY:\n=== TOTAL INSERTIONS:\t3767\n=== TOTAL DELETIONS:\t6782\n=== TOTAL SUBSTITUTIONS:\t10043\n=== TOTAL NCHANGE:\t20592\n=== TOTAL TRUE WORD COUNT:\t106873\n=== TOTAL TEST WORD COUNT:\t103858\n=== TOTAL TRUE WORDS RECALL:\t0.843\n=== TOTAL TEST WORDS PRECISION:\t0.867\n=== F MEASURE:\t0.855\n=== OOV Rate:\t0.025\n=== OOV Recall Rate:\t0.415\n=== IV Recall Rate:\t0.840\n###\tscws-2-standard-memory.utf8\t3767\t6782\t10043\t20592\t106873\t103858\t0.843\t0.867\t0.855\t0.025\t0.415\t0.840",
       "sighan_quality": {
         "precision": 0.867,
         "recall": 0.843,
         "f1": 0.855
       },
-      "tokens_per_pass": 103858,
       "speed": {
-        "iterations_per_sample": 24,
+        "iterations_per_sample": 27,
         "samples": 7,
         "seconds_per_pass": [
-          0.038032833333333335,
-          0.037580666666666665,
-          0.037695708333333335,
-          0.037985125,
-          0.04519691666666667,
-          0.038138958333333334,
-          0.039930875
+          0.037575333333333336,
+          0.04148,
+          0.03752681481481481,
+          0.03895625925925926,
+          0.039560185185185184,
+          0.040088962962962965,
+          0.039742074074074075
         ],
-        "median_seconds_per_pass": 0.038032833333333335,
-        "mib_per_second": 13.847708644101402,
-        "characters_per_second": 4847259.166421995
+        "median_seconds_per_pass": 0.039560185185185184,
+        "mib_per_second": 13.313072030484292,
+        "characters_per_second": 4660114.686951433
       }
     },
     "scws-2-standard-mmap": {
@@ -72,45 +89,41 @@
       },
       "tokens_per_pass": 103858,
       "speed": {
-        "iterations_per_sample": 23,
+        "iterations_per_sample": 27,
         "samples": 7,
         "seconds_per_pass": [
-          0.03779891304347826,
-          0.042608434782608694,
-          0.03860126086956522,
-          0.043026782608695656,
-          0.038806956521739135,
-          0.04356413043478261,
-          0.037639869565217386
+          0.04051151851851852,
+          0.038978740740740744,
+          0.03759385185185185,
+          0.038328148148148146,
+          0.039252999999999996,
+          0.040798777777777774,
+          0.039433222222222224
         ],
-        "median_seconds_per_pass": 0.038806956521739135,
-        "mib_per_second": 13.571473831364123,
-        "characters_per_second": 4750565.788294344
+        "median_seconds_per_pass": 0.039252999999999996,
+        "mib_per_second": 13.417257150018292,
+        "characters_per_second": 4696583.700608871
       }
     },
     "scws-2-search-memory": {
       "quality": null,
       "tokens_per_pass": 134314,
       "speed": {
-        "iterations_per_sample": 15,
+        "iterations_per_sample": 16,
         "samples": 7,
         "seconds_per_pass": [
-          0.07159913333333333,
-          0.06446713333333333,
-          0.06984753333333332,
-          0.06312733333333334,
-          0.06457146666666666,
-          0.06319673333333334,
-          0.0677988
+          0.0643920625,
+          0.0650395,
+          0.066490875,
+          0.06481275,
+          0.0649168125,
+          0.0632593125,
+          0.0649849375
         ],
-        "median_seconds_per_pass": 0.06457146666666666,
-        "mib_per_second": 8.156351746328637,
-        "characters_per_second": 2855053.6253370945
+        "median_seconds_per_pass": 0.0649168125,
+        "mib_per_second": 8.112961413650245,
+        "characters_per_second": 2839865.2506236346
       }
     }
-  },
-  "dictionary": {
-    "sha256": "af9e223bb26f5474b81c236dea3592dcaf96659d32865ace39455db18ee25d9c",
-    "bytes": 17854132
   }
 }
