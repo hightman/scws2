@@ -15,13 +15,13 @@
 #define HEADER 64u
 #define TRAILER 8u
 #define MAX_DICTIONARY_BYTES (512u * 1024u * 1024u)
-struct scws_dict { unsigned char *data; uint32_t size, buckets, base; scws_dict_mode mode; };
+struct scws_dict { unsigned char *data; uint32_t size, buckets, base; scws_dict_mode_t mode; };
 
 static uint32_t u32(const unsigned char *p)
 {
 	return (uint32_t) p[0] | (uint32_t) p[1] << 8 | (uint32_t) p[2] << 16 | (uint32_t) p[3] << 24;
 }
-static uint32_t hash(const scws_dict *dict, const unsigned char *key, size_t length)
+static uint32_t hash(const scws_dict_t *dict, const unsigned char *key, size_t length)
 {
 	uint32_t h = dict->base;
 	while (length--) h = ((h * 33u) ^ key[length]) & 0x7fffffffu;
@@ -32,7 +32,7 @@ static int key_compare(const unsigned char *a, size_t an, const unsigned char *b
 	int order = memcmp(a, b, an < bn ? an : bn);
 	return order ? order : an < bn ? -1 : an > bn;
 }
-static uint32_t find(const scws_dict *dict, const unsigned char *key, size_t length)
+static uint32_t find(const scws_dict_t *dict, const unsigned char *key, size_t length)
 {
 	uint32_t offset = u32(dict->data + HEADER + hash(dict, key, length) * 8u);
 	/* Compiler trees are balanced; 64 steps also stop accidental link cycles. */
@@ -49,7 +49,7 @@ static uint32_t find(const scws_dict *dict, const unsigned char *key, size_t len
 	}
 	return 0;
 }
-int scws_dict_lookup(const scws_dict *dict, const unsigned char *key, size_t length, scws_word *word)
+int scws_dict_lookup(const scws_dict_t *dict, const unsigned char *key, size_t length, scws_word *word)
 {
 	uint32_t offset;
 	const unsigned char *value;
@@ -64,7 +64,7 @@ int scws_dict_lookup(const scws_dict *dict, const unsigned char *key, size_t len
 	return 1;
 }
 /* Trusted compiler output: check framing, not every dictionary record. */
-static scws_status validate(scws_dict *dict)
+static scws_status_t validate(scws_dict_t *dict)
 {
 	const unsigned char *data = dict->data;
 	uint32_t count, floor;
@@ -83,16 +83,12 @@ static scws_status validate(scws_dict *dict)
 	return SCWS_OK;
 }
 
-scws_status scws_dict_open(const char *path, scws_dict **out)
-{
-	return scws_dict_open_ex(path, SCWS_DICT_MEMORY, out);
-}
-scws_status scws_dict_open_ex(const char *path, scws_dict_mode mode, scws_dict **out)
+scws_status_t scws_dict_open_ex(const char *path, scws_dict_mode_t mode, scws_dict_t **out)
 {
 	FILE *fp;
 	long length;
-	scws_dict *dict;
-	scws_status status;
+	scws_dict_t *dict;
+	scws_status_t status;
 	if (!out) return SCWS_EINVAL;
 	*out = NULL;
 	if (!path || (mode != SCWS_DICT_MEMORY && mode != SCWS_DICT_MMAP)) return SCWS_EINVAL;
@@ -133,7 +129,7 @@ scws_status scws_dict_open_ex(const char *path, scws_dict_mode mode, scws_dict *
 	*out = dict;
 	return SCWS_OK;
 }
-void scws_dict_close(scws_dict *dict)
+void scws_dict_close(scws_dict_t *dict)
 {
 	if (!dict) return;
 #ifdef SCWS_HAVE_MMAP

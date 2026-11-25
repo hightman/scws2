@@ -10,19 +10,19 @@ typedef struct {
 	uint64_t cost;
 	size_t to, tokens;
 	char pos[3];
-	scws_origin origin;
+	scws_origin_t origin;
 	int emit;
 } path;
 struct scws {
-	const scws_dict **dicts;
+	scws_dict_t **dicts;
 	size_t dict_count, dict_capacity;
-	scws_token *tokens;
+	scws_token_t *tokens;
 	size_t count, capacity, cursor;
 	unsigned flags;
 	uint32_t unknown_cost;
 };
 
-static scws_status reserve(void *array, size_t *capacity, size_t need, size_t width, void **out)
+static scws_status_t reserve(void *array, size_t *capacity, size_t need, size_t width, void **out)
 {
 	size_t next;
 	void *grown;
@@ -40,39 +40,58 @@ static scws_status reserve(void *array, size_t *capacity, size_t need, size_t wi
 	*out = grown; *capacity = next;
 	return SCWS_OK;
 }
-scws_status scws_add_dict(scws *ctx, const scws_dict *dict)
+static void clear_dicts(scws_t ctx)
 {
-	scws_status status;
-	void *grown;
-	if (!ctx || !dict) return SCWS_EINVAL;
-	if (ctx->dict_count == SIZE_MAX) return SCWS_ELIMIT;
-	status = reserve(ctx->dicts, &ctx->dict_capacity, ctx->dict_count + 1, sizeof(*ctx->dicts), &grown);
-	if (!status) { ctx->dicts = grown; ctx->dicts[ctx->dict_count++] = dict; }
-	return status;
+	for (size_t i = 0; i < ctx->dict_count; i++) scws_dict_close(ctx->dicts[i]);
+	ctx->dict_count = 0;
 }
-scws_status scws_new(const scws_dict *dict, scws **out)
+static scws_status_t load_dict(scws_t ctx, const char *filename, scws_dict_mode_t mode, int replace)
 {
-	scws *ctx;
-	scws_status status;
-	if (!out) return SCWS_EINVAL;
-	*out = NULL;
-	if (!dict) return SCWS_EINVAL;
-	ctx = calloc(1, sizeof(*ctx));
-	if (!ctx) return SCWS_ENOMEM;
-	ctx->unknown_cost = 18432;
-	status = scws_add_dict(ctx, dict);
-	if (status) { scws_free(ctx); return status; }
-	*out = ctx;
+	scws_dict_t *dict = NULL;
+	scws_status_t status;
+	void *grown;
+	if (!ctx) return SCWS_EINVAL;
+	if (!replace && ctx->dict_count == SIZE_MAX) return SCWS_ELIMIT;
+	status = scws_dict_open_ex(filename, mode, &dict);
+	if (status) return status;
+	status = reserve(ctx->dicts, &ctx->dict_capacity, replace ? 1 : ctx->dict_count + 1,
+		sizeof(*ctx->dicts), &grown);
+	if (status) { scws_dict_close(dict); return status; }
+	ctx->dicts = grown;
+	if (replace) clear_dicts(ctx);
+	ctx->dicts[ctx->dict_count++] = dict;
 	return SCWS_OK;
 }
-void scws_free(scws *ctx)
+scws_status_t scws_set_dict(scws_t ctx, const char *filename, scws_dict_mode_t mode)
 {
-	if (ctx) { free(ctx->dicts); free(ctx->tokens); free(ctx); }
+	return load_dict(ctx, filename, mode, 1);
 }
-scws_status scws_set_options(scws *ctx, unsigned flags, uint32_t unknown_cost)
+scws_status_t scws_add_dict(scws_t ctx, const char *filename, scws_dict_mode_t mode)
 {
-	if (!ctx || flags & ~(SCWS_KEEP_SYMBOLS | SCWS_FALLBACK_BIGRAM) || !unknown_cost) return SCWS_EINVAL;
-	ctx->flags = flags; ctx->unknown_cost = unknown_cost;
+	return load_dict(ctx, filename, mode, 0);
+}
+scws_t scws_new(void)
+{
+	scws_t ctx = calloc(1, sizeof(*ctx));
+	if (ctx) ctx->unknown_cost = 18432;
+	return ctx;
+}
+void scws_free(scws_t ctx)
+{
+	if (!ctx) return;
+	clear_dicts(ctx);
+	free(ctx->dicts); free(ctx->tokens); free(ctx);
+}
+scws_status_t scws_set_options(scws_t ctx, unsigned flags)
+{
+	if (!ctx || flags & ~(SCWS_KEEP_SYMBOLS | SCWS_FALLBACK_BIGRAM)) return SCWS_EINVAL;
+	ctx->flags = flags;
+	return SCWS_OK;
+}
+scws_status_t scws_set_unknown_cost(scws_t ctx, uint32_t cost)
+{
+	if (!ctx || !cost) return SCWS_EINVAL;
+	ctx->unknown_cost = cost;
 	return SCWS_OK;
 }
 
@@ -112,7 +131,7 @@ static void atomize(unit *units, size_t count)
 		i = end;
 	}
 }
-static int lookup(const scws *ctx, const unsigned char *key, size_t length, scws_word *out)
+static int lookup(scws_t ctx, const unsigned char *key, size_t length, scws_word *out)
 {
 	scws_word word;
 	uint32_t prefix = 0;
@@ -127,7 +146,7 @@ static int lookup(const scws *ctx, const unsigned char *key, size_t length, scws
 	return found;
 }
 static void consider(path *paths, size_t from, size_t to, uint32_t cost, int emit,
-	const char *pos, scws_origin origin)
+	const char *pos, scws_origin_t origin)
 {
 	path *current = &paths[from];
 	uint64_t score = paths[to].cost + cost;
@@ -139,11 +158,11 @@ static void consider(path *paths, size_t from, size_t to, uint32_t cost, int emi
 		strcpy(current->pos, pos);
 	}
 }
-static scws_status append(scws *ctx, const unit *units, size_t from, size_t to,
-	const char *pos, scws_kind kind, scws_origin origin)
+static scws_status_t append(scws_t ctx, const unit *units, size_t from, size_t to,
+	const char *pos, scws_kind_t kind, scws_origin_t origin)
 {
-	scws_status status;
-	scws_token *token;
+	scws_status_t status;
+	scws_token_t *token;
 	void *grown;
 	if (ctx->count == SIZE_MAX) return SCWS_ELIMIT;
 	status = reserve(ctx->tokens, &ctx->capacity, ctx->count + 1, sizeof(*ctx->tokens), &grown);
@@ -159,21 +178,21 @@ static scws_status append(scws *ctx, const unit *units, size_t from, size_t to,
 }
 static int token_compare(const void *left, const void *right)
 {
-	const scws_token *a = left, *b = right;
+	const scws_token_t *a = left, *b = right;
 	if (a->offset != b->offset) return a->offset < b->offset ? -1 : 1;
 	if (a->length != b->length) return a->length > b->length ? -1 : 1;
 	if (a->kind != b->kind) return a->kind < b->kind ? -1 : 1;
 	return a->origin < b->origin ? -1 : a->origin > b->origin;
 }
 
-scws_status scws_segment(scws *ctx, const char *input, size_t length, scws_mode mode)
+scws_status_t scws_segment(scws_t ctx, const char *input, size_t length, scws_mode_t mode)
 {
 	const unsigned char *text = (const unsigned char *) input;
 	unit *units = NULL;
 	path *paths = NULL;
 	unsigned char *unknown = NULL;
 	size_t count = 0, offset = 0;
-	scws_status status = SCWS_OK;
+	scws_status_t status = SCWS_OK;
 	if (!ctx) return SCWS_EINVAL;
 	ctx->count = ctx->cursor = 0;
 	if ((!input && length) || (mode != SCWS_STANDARD && mode != SCWS_SEARCH)) return SCWS_EINVAL;
@@ -265,7 +284,7 @@ scws_status scws_segment(scws *ctx, const char *input, size_t length, scws_mode 
 		}
 		for (size_t t = 0; t < primary_count; t++) {
 			/* append can realloc ctx->tokens, so copy all needed fields first. */
-			scws_token token = ctx->tokens[t];
+			scws_token_t token = ctx->tokens[t];
 			size_t end = token.char_offset + token.char_length;
 			const unit *first = &units[token.char_offset];
 			if (first->number_to && (end == first->number_to || end == first->quantity_to)) {
@@ -306,12 +325,12 @@ done:
 	if (status) ctx->count = ctx->cursor = 0;
 	return status;
 }
-const scws_token *scws_next(scws *ctx)
+const scws_token_t *scws_next(scws_t ctx)
 {
 	return ctx && ctx->cursor < ctx->count ? &ctx->tokens[ctx->cursor++] : NULL;
 }
-size_t scws_count(const scws *ctx) { return ctx ? ctx->count : 0; }
-const char *scws_strerror(scws_status status)
+size_t scws_count(scws_t ctx) { return ctx ? ctx->count : 0; }
+const char *scws_strerror(scws_status_t status)
 {
 	static const char *const messages[] = {"success", "invalid argument", "out of memory", "I/O error",
 		"invalid dictionary format", "invalid UTF-8", "resource limit exceeded", "operation not supported"};

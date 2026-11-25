@@ -9,7 +9,7 @@
 | 模块 | 当前状态 |
 | --- | --- |
 | 词典 | 已提供来源锁定、人工修订、可复现 XDB2 构建、校验及词表差异报告；仍需补充新词来源和质量评估 |
-| 核心库与 CLI | 已实现只读共享词典、严格 UTF-8、英文数字处理、候选 DAG、动态规划、standard/search 模式、叠加词典及可区分来源的补词；已有生命周期和多线程共享测试 |
+| 核心库与 CLI | 已实现上下文内部管理词典、严格 UTF-8、英文数字处理、候选 DAG、动态规划、standard/search 模式、叠加词典及可区分来源的补词；已有生命周期和独立上下文并发测试 |
 | PHP 扩展 | 尚未实现，待核心稳定后以对象接口薄封装 C 核心 |
 
 当前是可运行原型，尚未通过真实检索质量和完整跨平台验收。搜索补词的歧义筛选仍需评估，算法替换不会自动解决旧词和新词不足问题。正式发布前须用分词及小型检索评估集衡量召回、误召回、词数、内存和速度；未验证的词典更新不自动发布。
@@ -32,7 +32,7 @@ printf '南京市长江大桥\n' | build/scws -d build/dict/dictionary.xdb
 
 只有显式 `fetch` 联网，构建和测试不会自动下载词典。构建生成静态库、共享库、CLI 和词典编译器。`make install PREFIX=/path/to/prefix` 安装库、头文件和工具，不自动安装下载词典。
 
-CLI 默认读取全部标准输入，以 TSV 输出字节跨度、字符跨度、词性、种类、来源和原词。`--search` 增加检索补词，`--bigrams` 可在搜索模式开启未知汉字二元兜底，`--symbols` 保留符号。
+CLI 可不传 `-d`，此时仅使用内置规则和未知字符兜底。默认读取全部标准输入，以 TSV 输出字节跨度、字符跨度、词性、种类、来源和原词。`--search` 增加检索补词，`--bigrams` 可在搜索模式开启未知汉字二元兜底，`--symbols` 保留符号。
 
 ## 分词用例对照
 
@@ -47,7 +47,7 @@ python3 tools/check_segments.py --case case-07-standard --case case-07-search
 
 ## 词典
 
-词典默认整库加载到内存；C API 可用 `scws_dict_open_ex(path, SCWS_DICT_MMAP, &dict)` 选择只读映射，契约见 [API.md](API.md)。映射模式不自动回退到内存加载。
+词典默认整库加载到内存；C API 先用 `scws_t ctx = scws_new()` 创建上下文，再用 `scws_set_dict(ctx, path, SCWS_DICT_MEMORY)` 加载词典，或传 `SCWS_DICT_MMAP` 选择只读映射；`scws_free(ctx)` 统一释放，契约见 [API.md](API.md)。映射模式不自动回退到内存加载。
 
 当前唯一接入的上游是 jieba 标准词典，THUOCL 尚未融入。词性最多两个 ASCII 字符，`nrt`、`nrfg` 在加工时归并为 `nr`，缺失时为空；词性不参与切分评分。
 

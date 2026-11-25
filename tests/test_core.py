@@ -150,9 +150,14 @@ class CoreTests(unittest.TestCase):
         token = self.invoke('a' * 100000)[0]
         self.assertEqual((token['length'], token['char_length']), (100000, 100000))
 
-    def test_native_api_lifecycle_errors_and_shared_dictionary(self):
+    def test_native_api_lifecycle_errors_and_owned_dictionaries(self):
         result = subprocess.run([str(self.api), str(self.dictionary), str(self.overlay)], capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr.decode())
+
+    def test_cli_without_dictionary_uses_rules_and_unknown_characters(self):
+        result = subprocess.run([str(self.cli), '-i', '中文 C++ 2026年'], capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([line.split('\t')[-1] for line in result.stdout.splitlines()], ['中', '文', 'C++', '2026年'])
 
     def test_memory_only_build_reports_mmap_unsupported(self):
         result = subprocess.run([str(self.no_mmap_api), str(self.dictionary), str(self.overlay)],
