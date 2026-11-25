@@ -1,6 +1,10 @@
-# SCWS 2.0
+# scws2
 
-面向社区、CMS 等通用全文检索的纯 C 词典分词工具包，项目暂沿用 SCWS 名称。仅支持 UTF-8；运行时无第三方依赖，不提供关键词提取和 IDF。C 接口见 [API.md](API.md)。
+面向社区、CMS 等通用全文检索的纯 C 词典分词工具包。仅支持 UTF-8；运行时无第三方依赖，不提供关键词提取和 IDF。C 接口见 [API.md](API.md)。
+
+scws2 源自 [SCWS 1.x](https://github.com/hightman/scws) 的词典分词思路，是独立维护的新项目，不是原项目的兼容升级。C API、PHP 扩展接口及 XDB2 词典格式均与 SCWS 1.x 不兼容，不能直接替换；库名为 `libscws2`，头文件为 `scws2.h`，C 符号使用 `scws2_` 前缀，未来 PHP 扩展命名为 `scws2`，以支持两代实现并存。
+
+本仓库历史从新版词典流水线的首次提交开始，不包含 SCWS 1.x 提交历史；原项目代码、历史及旧 PHP 扩展请查阅上述来源仓库。原作者信息及许可证保留在 `AUTHORS` 和 `COPYING`。
 
 ## 本机初步评测
 
@@ -41,8 +45,8 @@ make check
 python3 dict/build.py fetch
 python3 dict/build.py build
 
-build/scws -d build/dict/dictionary.xdb --search -i '中文分词测试'
-printf '南京市长江大桥\n' | build/scws -d build/dict/dictionary.xdb
+build/scws2 -d build/dict/dictionary.xdb --search -i '中文分词测试'
+printf '南京市长江大桥\n' | build/scws2 -d build/dict/dictionary.xdb
 ```
 
 只有显式 `fetch` 联网，构建和测试不会自动下载词典。构建生成静态库、共享库、CLI 和词典编译器。`make install PREFIX=/path/to/prefix` 安装库、头文件和工具，不自动安装下载词典。
@@ -64,9 +68,9 @@ python3 tools/check_segments.py --case case-07-standard --case case-07-search
 
 ## 词典
 
-词典默认整库加载到内存；C API 先用 `scws_t ctx = scws_new()` 创建上下文，再用 `scws_set_dict(ctx, path, 0)` 加载词典，或传 `SCWS_DICT_MMAP` 选择只读映射；`scws_free(ctx)` 统一释放词典和上下文。`scws_segment()` 返回独立的 `scws_result_t`，用 `scws_result_next()` 遍历、`scws_result_free()` 释放，可嵌套分词；结果在 ctx 释放后仍有效。契约见 [API.md](API.md)。mmap 不可用时退回内存。
+词典默认整库加载到内存；C API 先用 `scws2_t ctx = scws2_new()` 创建上下文，再用 `scws2_set_dict(ctx, path, 0)` 加载词典，或传 `SCWS2_DICT_MMAP` 选择只读映射；`scws2_free(ctx)` 统一释放词典和上下文。`scws2_segment()` 返回独立的 `scws2_result_t`，用 `scws2_result_next()` 遍历、`scws2_result_free()` 释放，可嵌套分词；结果在 ctx 释放后仍有效。契约见 [API.md](API.md)。mmap 不可用时退回内存。
 
-运行时可用 `scws_add_dict(ctx, "user.txt", SCWS_DICT_TEXT)` 加载 UTF-8 自定义词表。一行一个词，支持空格/Tab 分隔的 `词条 词频 词性` 或 `词条 词性 词频`；缺省词性为 `un`，缺省及 `0` 词频按最低值 `1` 处理。文本自动编译并缓存为临时 XDB，后续加载跨进程复用；默认以内存方式加载，按位组合 `SCWS_DICT_TEXT | SCWS_DICT_MMAP` 可请求 mmap，不记忆前次加载方式。格式、词频参考及缓存说明见 [API.md](API.md#文本词典)，词性说明见 [dict/POS.md](dict/POS.md)。
+运行时可用 `scws2_add_dict(ctx, "user.txt", SCWS2_DICT_TEXT)` 加载 UTF-8 自定义词表。一行一个词，支持空格/Tab 分隔的 `词条 词频 词性` 或 `词条 词性 词频`；缺省词性为 `un`，缺省及 `0` 词频按最低值 `1` 处理。文本自动编译并缓存为临时 XDB，后续加载跨进程复用；默认以内存方式加载，按位组合 `SCWS2_DICT_TEXT | SCWS2_DICT_MMAP` 可请求 mmap，不记忆前次加载方式。格式、词频参考及缓存说明见 [API.md](API.md#文本词典)，词性说明见 [dict/POS.md](dict/POS.md)。
 
 当前唯一接入的上游是 jieba 标准词典，THUOCL 尚未融入。词性最多两个 ASCII 字符，`nrt`、`nrfg` 在加工时归并为 `nr`，缺失时为空；词性不参与切分评分。
 
@@ -82,7 +86,7 @@ python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
 
 `make` 按规则源和生成器的修改时间自动更新 `build/rules_data.h` 并重新编译，`make rules` 可手动强制生成。生成代码不进入 Git，运行时不读取 INI；详细边界见 [src/RULES.md](src/RULES.md)。
 
-2.0 不兼容 1.x 的 API 和 XDB。旧字符集代码、旧引擎、Autotools 构建及历史 PHP 演示已移除，可从 Git 历史或主分支查阅。旧 PHP 扩展不再作为 2.0 可构建组件发布。
+2.0 不兼容 1.x 的 API 和 XDB。旧字符集代码、旧引擎、Autotools 构建及历史 PHP 演示已移除，可从 [原 SCWS 仓库](https://github.com/hightman/scws)查阅。旧 PHP 扩展不再作为 2.0 可构建组件发布。
 
 ## 许可
 

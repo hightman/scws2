@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if !defined(SCWS_NO_TEXT_CACHE) && (defined(__unix__) || defined(__APPLE__))
+#if !defined(SCWS2_NO_TEXT_CACHE) && (defined(__unix__) || defined(__APPLE__))
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -52,7 +52,7 @@ static char *cache_path(const char *source, const struct stat *st)
 	capacity = strlen(temporary) + 192;
 	directory = malloc(capacity); path = malloc(capacity);
 	if (!directory || !path) { free(directory); free(path); return NULL; }
-	snprintf(directory, capacity, "%s/scws-text-%ju", temporary, (uintmax_t) geteuid());
+	snprintf(directory, capacity, "%s/scws2-text-%ju", temporary, (uintmax_t) geteuid());
 	if ((mkdir(directory, 0700) && errno != EEXIST) || lstat(directory, &info)
 		|| !S_ISDIR(info.st_mode) || info.st_uid != geteuid() || (info.st_mode & 077)) {
 		free(directory); free(path); return NULL;
@@ -62,12 +62,12 @@ static char *cache_path(const char *source, const struct stat *st)
 	free(directory);
 	return path;
 }
-static scws_status_t open_cache(const char *path, scws_dict_flags_t flags, scws_dict_t **out)
+static scws2_status_t open_cache(const char *path, scws2_dict_flags_t flags, scws2_dict_t **out)
 {
 	struct stat st;
 	if (lstat(path, &st) || !S_ISREG(st.st_mode) || st.st_uid != geteuid()
-		|| (st.st_mode & 077)) return SCWS_EIO;
-	return scws_dict_open_ex(path, flags, out);
+		|| (st.st_mode & 077)) return SCWS2_EIO;
+	return scws2_dict_open_ex(path, flags, out);
 }
 static int lock_cache(const char *path)
 {
@@ -109,15 +109,15 @@ static int publish(const char *path, const unsigned char *data, uint32_t size)
 }
 #endif
 
-scws_status_t scws_text_open(const char *path, scws_dict_flags_t flags, scws_dict_t **out)
+scws2_status_t scws2_text_open(const char *path, scws2_dict_flags_t flags, scws2_dict_t **out)
 {
 	unsigned char *data = NULL;
 	uint32_t size = 0;
-	scws_status_t status;
-	if (!path || !out || (flags & ~SCWS_DICT_MMAP))
-		return SCWS_EINVAL;
+	scws2_status_t status;
+	if (!path || !out || (flags & ~SCWS2_DICT_MMAP))
+		return SCWS2_EINVAL;
 	*out = NULL;
-#if !defined(SCWS_NO_TEXT_CACHE) && (defined(__unix__) || defined(__APPLE__))
+#if !defined(SCWS2_NO_TEXT_CACHE) && (defined(__unix__) || defined(__APPLE__))
 	char *source = realpath(path, NULL), *cache = NULL;
 	struct stat before, after;
 	int locked = -1;
@@ -126,27 +126,27 @@ scws_status_t scws_text_open(const char *path, scws_dict_flags_t flags, scws_dic
 		cache = cache_path(source, &before);
 	if (cache) {
 		status = open_cache(cache, flags, out);
-		if (!status) { free(cache); free(source); return SCWS_OK; }
+		if (!status) { free(cache); free(source); return SCWS2_OK; }
 		locked = lock_cache(cache);
 		if (locked >= 0 && !open_cache(cache, flags, out)) {
-			close(locked); free(cache); free(source); return SCWS_OK;
+			close(locked); free(cache); free(source); return SCWS2_OK;
 		}
 	}
-	status = scws_text_load(source ? source : path, &data, &size);
+	status = scws2_text_load(source ? source : path, &data, &size);
 	if (!status && cache && (stat(source, &after) || stamp(&before) != stamp(&after))) {
-		free(data); data = NULL; status = SCWS_EIO;
+		free(data); data = NULL; status = SCWS2_EIO;
 	}
 	if (!status && locked >= 0 && publish(cache, data, size)) {
-		scws_status_t loaded = open_cache(cache, flags, out);
+		scws2_status_t loaded = open_cache(cache, flags, out);
 		if (!loaded) {
-			free(data); close(locked); free(cache); free(source); return SCWS_OK;
+			free(data); close(locked); free(cache); free(source); return SCWS2_OK;
 		}
 	}
 	if (locked >= 0) close(locked);
 	free(cache); free(source);
 #else
-	status = scws_text_load(path, &data, &size);
+	status = scws2_text_load(path, &data, &size);
 #endif
 	if (status) { free(data); return status; }
-	return scws_dict_from_data(data, size, out);
+	return scws2_dict_from_data(data, size, out);
 }

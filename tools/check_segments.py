@@ -112,7 +112,7 @@ def compare(case, tokens):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cases', type=Path, default=ROOT / 'tests/cases/segmentation.json', help='UTF-8 JSON 用例文件')
-    parser.add_argument('--scws', type=Path, default=ROOT / 'build/scws', help='SCWS 2 CLI 路径')
+    parser.add_argument('--scws2', type=Path, default=ROOT / 'build/scws2', help='scws2 CLI 路径')
     parser.add_argument('-d', '--dict', dest='dictionaries', type=Path, action='append', help='词典，可重复指定叠加词典')
     parser.add_argument('--case', action='append', dest='ids', help='只执行指定 id，可重复')
     parser.add_argument('--observe', action='store_true', help='仅观察，分词差异不影响退出码；执行错误仍失败')
@@ -129,7 +129,7 @@ def main(argv=None):
         print(f'配置错误: {error}', file=sys.stderr)
         return 2
     dictionaries = args.dictionaries or [ROOT / 'build/dict/dictionary.xdb']
-    print(f'用例: {args.cases}\nCLI: {args.scws}')
+    print(f'用例: {args.cases}\nCLI: {args.scws2}')
     print('词典: ' + ', '.join(map(str, dictionaries)))
     if document.get('description'):
         print(document['description'])
@@ -145,7 +145,7 @@ def main(argv=None):
         if 'expected_primary' in case:
             print('预期主词: ' + words(case['expected_primary']))
         try:
-            tokens = segment(args.scws.resolve(), dictionaries, case)
+            tokens = segment(args.scws2.resolve(), dictionaries, case)
             status, differences = compare(case, tokens)
             print('实际: ' + words([token['word'] for token in tokens]))
             print('词性: ' + words([token['word'] + '/' + (token['pos'] or '?') for token in tokens]))

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure SCWS 2 word-span quality and warm native throughput."""
+"""Measure scws2 word-span quality and warm native throughput."""
 import argparse
 from datetime import datetime, timezone
 import hashlib
@@ -98,9 +98,9 @@ def compile_engine(output, cc):
     run([sys.executable, '-B', ROOT / 'tools/gen_rules.py', '--output', output / 'rules_data.h'])
     command = cc + ['-O2', '-std=c11', '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src'),
                     '-I' + str(output)]
-    command += [str(ROOT / 'src' / name) for name in ('scws.c', 'utf8.c', 'xdb.c', 'text.c', 'text_cache.c', 'rules.c')]
-    binary = output / 'bench-scws'
-    command += [str(ROOT / 'tools/bench_scws.c'), '-o', str(binary)]
+    command += [str(ROOT / 'src' / name) for name in ('scws2.c', 'utf8.c', 'xdb.c', 'text.c', 'text_cache.c', 'rules.c')]
+    binary = output / 'bench-scws2'
+    command += [str(ROOT / 'tools/bench_scws2.c'), '-o', str(binary)]
     result = subprocess.run(command, capture_output=True)
     (output / 'compile.log').write_bytes((shlex.join(command) + '\n').encode() + result.stdout + result.stderr)
     result.check_returncode()
@@ -182,10 +182,10 @@ def main(argv=None):
     gold_file.write_text('\n'.join(' '.join(words) for words in gold) + '\n', encoding='utf-8')
     input_file.write_text('\n'.join(text) + '\n', encoding='utf-8')
     binary = compile_engine(output, cc)
-    configurations = [('scws-2-standard-memory', 'memory', 'standard'),
-                      ('scws-2-standard-mmap', 'mmap', 'standard'),
-                      ('scws-2-search-memory', 'memory', 'search')]
-    source_files = sorted([ROOT / 'include/scws.h', ROOT / 'tools/bench_scws.c', ROOT / 'tools/gen_rules.py',
+    configurations = [('scws2-standard-memory', 'memory', 'standard'),
+                      ('scws2-standard-mmap', 'mmap', 'standard'),
+                      ('scws2-search-memory', 'memory', 'search')]
+    source_files = sorted([ROOT / 'include/scws2.h', ROOT / 'tools/bench_scws2.c', ROOT / 'tools/gen_rules.py',
                            *list((ROOT / 'src').glob('*.c')), *list((ROOT / 'src').glob('*.h'))])
     report = {'timestamp_utc': datetime.now(timezone.utc).isoformat(), 'machine': machine_info(cc),
               'current_revision': git('rev-parse', 'HEAD').decode().strip(),
@@ -208,7 +208,7 @@ def main(argv=None):
         prediction.write_text('\n'.join(' '.join(words) for words in predicted) + '\n', encoding='utf-8')
         quality = score_spans(gold, positioned) if mode == 'standard' else None
         result = {'quality': quality, 'tokens_per_pass': sum(map(len, predicted))}
-        if scorer and name == 'scws-2-standard-memory':
+        if scorer and name == 'scws2-standard-memory':
             official_raw = run(['perl', scorer, training_words, gold_file, prediction]).stdout
             (output / (name + '-sighan.txt')).write_bytes(official_raw)
             official = official_raw.decode('utf-8', errors='replace')
@@ -229,7 +229,7 @@ def main(argv=None):
         elapsed = result['speed']['median_seconds_per_pass']
         result['speed']['mib_per_second'] = report['corpus']['utf8_bytes_without_newlines'] / elapsed / 1048576
         result['speed']['characters_per_second'] = report['corpus']['characters'] / elapsed
-    if (output / 'scws-2-standard-memory.utf8').read_bytes() != (output / 'scws-2-standard-mmap.utf8').read_bytes():
+    if (output / 'scws2-standard-memory.utf8').read_bytes() != (output / 'scws2-standard-mmap.utf8').read_bytes():
         raise ValueError('memory and mmap segmentation differ')
     (output / 'results.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     for name, result in report['results'].items():

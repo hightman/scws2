@@ -23,7 +23,7 @@ class CoreTests(unittest.TestCase):
         cls.environment = patch.dict(os.environ, {'TMPDIR': str(cls.root)})
         cls.environment.start()
         cls.addClassCleanup(cls.environment.stop)
-        cls.cli = cls.root / 'scws'
+        cls.cli = cls.root / 'scws2'
         cls.compiler = cls.root / 'scws2-dict'
         cls.api = cls.root / 'api-test'
         cls.no_mmap_api = cls.root / 'api-no-mmap-test'
@@ -32,11 +32,11 @@ class CoreTests(unittest.TestCase):
                         '--output', str(cls.root / 'rules_data.h')], check=True)
         cc = shlex.split(os.environ.get('CC', 'cc'))
         flags = ['-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + shlex.split(os.environ.get('CORE_TEST_CFLAGS', '-O2'))
-        source = [str(ROOT / name) for name in ('src/scws.c', 'src/utf8.c', 'src/xdb.c', 'src/text.c', 'src/text_cache.c', 'src/rules.c')]
+        source = [str(ROOT / name) for name in ('src/scws2.c', 'src/utf8.c', 'src/xdb.c', 'src/text.c', 'src/text_cache.c', 'src/rules.c')]
         includes = ['-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src'), '-I' + str(cls.root)]
-        for main, output, extra in [('cli/scws.c', cls.cli, []), ('tests/core_api.c', cls.api, ['-pthread']), ('tests/text_dict.c', cls.text_compiler, [])]:
+        for main, output, extra in [('cli/scws2.c', cls.cli, []), ('tests/core_api.c', cls.api, ['-pthread']), ('tests/text_dict.c', cls.text_compiler, [])]:
             subprocess.run(cc + flags + includes + source + [str(ROOT / main), '-o', str(output)] + extra, check=True)
-        subprocess.run(cc + flags + includes + ['-DSCWS_NO_MMAP'] + source
+        subprocess.run(cc + flags + includes + ['-DSCWS2_NO_MMAP'] + source
                        + [str(ROOT / 'tests/core_api.c'), '-pthread', '-o', str(cls.no_mmap_api)], check=True)
         subprocess.run(cc + flags + [str(ROOT / 'cli/scws2-dict.c'), '-o', str(cls.compiler)], check=True)
         cls.dictionary = cls.build('base', [
@@ -260,7 +260,7 @@ class CoreTests(unittest.TestCase):
         path = self.root / 'cases.json'
         path.write_text(json.dumps({'cases': cases}, ensure_ascii=False), encoding='utf-8')
         return subprocess.run([os.sys.executable, '-B', str(ROOT / 'tools/check_segments.py'),
-                               '--scws', str(self.cli), '-d', str(self.dictionary),
+                               '--scws2', str(self.cli), '-d', str(self.dictionary),
                                '--cases', str(path), *options], capture_output=True, text=True, timeout=15)
 
     def test_case_tool_displays_compares_and_filters(self):

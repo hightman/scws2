@@ -45,27 +45,27 @@ static uint32_t frequency_cost(uint32_t frequency)
 	reduction = (exponent * 0.69314718055994530942 + 2 * sum) * 1024;
 	return reduction >= REFERENCE_COST ? 0 : (uint32_t) (REFERENCE_COST - reduction + 0.5);
 }
-static scws_status_t add(builder *b, const char *key, size_t length, const scws_word *word)
+static scws2_status_t add(builder *b, const char *key, size_t length, const scws2_word *word)
 {
 	entry *item;
-	if (b->count >= MAX_BYTES / 28u) return SCWS_ELIMIT;
+	if (b->count >= MAX_BYTES / 28u) return SCWS2_ELIMIT;
 	if (b->count == b->capacity) {
 		size_t next = b->capacity ? b->capacity * 2 : 256;
 		entry *grown;
-		if (next < b->capacity || next > SIZE_MAX / sizeof(*grown)) return SCWS_ELIMIT;
+		if (next < b->capacity || next > SIZE_MAX / sizeof(*grown)) return SCWS2_ELIMIT;
 		grown = realloc(b->entries, next * sizeof(*grown));
-		if (!grown) return SCWS_ENOMEM;
+		if (!grown) return SCWS2_ENOMEM;
 		b->entries = grown; b->capacity = next;
 	}
 	item = &b->entries[b->count];
 	memset(item, 0, sizeof(*item));
 	item->key = malloc(length + 1);
-	if (!item->key) return SCWS_ENOMEM;
+	if (!item->key) return SCWS2_ENOMEM;
 	memcpy(item->key, key, length); item->key[length] = '\0';
 	item->length = (unsigned char) length;
 	item->cost = word->cost; item->flags = word->flags; memcpy(item->pos, word->pos, 3);
 	item->sequence = (uint32_t) b->count++;
-	return SCWS_OK;
+	return SCWS2_OK;
 }
 static int parse_frequency(const char *s, uint32_t *out)
 {
@@ -84,27 +84,27 @@ static int parse_pos(const char *s, char pos[3])
 	size_t length;
 	if (!strcmp(s, "nrt") || !strcmp(s, "nrfg")) s = "nr";
 	length = strlen(s);
-	if (!length || length > 2 || !scws_alpha((unsigned char) s[0])) return 0;
-	if (length == 2 && !scws_alpha((unsigned char) s[1]) && !scws_digit((unsigned char) s[1])
+	if (!length || length > 2 || !scws2_alpha((unsigned char) s[0])) return 0;
+	if (length == 2 && !scws2_alpha((unsigned char) s[1]) && !scws2_digit((unsigned char) s[1])
 		&& s[1] != '_' && s[1] != '-') return 0;
 	memset(pos, 0, 3); memcpy(pos, s, length);
 	return 1;
 }
-static scws_status_t parse_line(builder *b, char *line, size_t length, int first)
+static scws2_status_t parse_line(builder *b, char *line, size_t length, int first)
 {
 	char *fields[3], *s = line;
 	size_t count = 0, ends[MAX_KEY], characters = 0;
 	uint32_t frequency = 1;
-	scws_word word = {0, SCWS_WORD_MAIN | SCWS_WORD_SEARCH, "un"};
-	scws_word prefix = {0, SCWS_WORD_PREFIX, ""};
-	scws_status_t status;
+	scws2_word word = {0, SCWS2_WORD_MAIN | SCWS2_WORD_SEARCH, "un"};
+	scws2_word prefix = {0, SCWS2_WORD_PREFIX, ""};
+	scws2_status_t status;
 	if (length && line[length - 1] == '\r') length--;
 	line[length] = '\0';
 	if (first && length >= 3 && !memcmp(line, "\xef\xbb\xbf", 3)) s += 3;
 	while (*s == ' ' || *s == '\t') s++;
-	if (!*s || *s == '#' || *s == ';') return SCWS_OK;
+	if (!*s || *s == '#' || *s == ';') return SCWS2_OK;
 	while (*s) {
-		if (count == 3) return SCWS_EFORMAT;
+		if (count == 3) return SCWS2_EFORMAT;
 		fields[count++] = s;
 		while (*s && *s != ' ' && *s != '\t') s++;
 		if (*s) *s++ = '\0';
@@ -112,19 +112,19 @@ static scws_status_t parse_line(builder *b, char *line, size_t length, int first
 	}
 	if (count > 1) {
 		if (fields[1][0] >= '0' && fields[1][0] <= '9') {
-			if (!parse_frequency(fields[1], &frequency)) return SCWS_EFORMAT;
-			if (count == 3 && !parse_pos(fields[2], word.pos)) return SCWS_EFORMAT;
+			if (!parse_frequency(fields[1], &frequency)) return SCWS2_EFORMAT;
+			if (count == 3 && !parse_pos(fields[2], word.pos)) return SCWS2_EFORMAT;
 		} else {
-			if (!parse_pos(fields[1], word.pos)) return SCWS_EFORMAT;
-			if (count == 3 && !parse_frequency(fields[2], &frequency)) return SCWS_EFORMAT;
+			if (!parse_pos(fields[1], word.pos)) return SCWS2_EFORMAT;
+			if (count == 3 && !parse_frequency(fields[2], &frequency)) return SCWS2_EFORMAT;
 		}
 	}
 	length = strlen(fields[0]);
-	if (!length || length > MAX_KEY) return SCWS_EFORMAT;
+	if (!length || length > MAX_KEY) return SCWS2_EFORMAT;
 	for (size_t i = 0, width; i < length; i += width) {
 		uint32_t ch;
-		width = scws_utf8_decode((const unsigned char *) fields[0] + i, length - i, &ch);
-		if (!width || scws_space(ch) || (ch >= 0x7f && ch < 0xa0)) return SCWS_EFORMAT;
+		width = scws2_utf8_decode((const unsigned char *) fields[0] + i, length - i, &ch);
+		if (!width || scws2_space(ch) || (ch >= 0x7f && ch < 0xa0)) return SCWS2_EFORMAT;
 		ends[characters++] = i + width;
 	}
 	word.cost = frequency_cost(frequency);
@@ -134,7 +134,7 @@ static scws_status_t parse_line(builder *b, char *line, size_t length, int first
 		status = add(b, fields[0], ends[i], &prefix);
 		if (status) return status;
 	}
-	return SCWS_OK;
+	return SCWS2_OK;
 }
 static int compare(const void *left, const void *right)
 {
@@ -165,7 +165,7 @@ static void tree(unsigned char *data, const entry *entries, size_t lo, size_t hi
 	pointer(node, entries, lo, mid); pointer(node + 8, entries, mid + 1, hi);
 	tree(data, entries, lo, mid); tree(data, entries, mid + 1, hi);
 }
-static scws_status_t serialize(builder *b, unsigned char **out, uint32_t *size)
+static scws2_status_t serialize(builder *b, unsigned char **out, uint32_t *size)
 {
 	uint32_t buckets = b->count <= 128 ? 17 : b->count <= 2048 ? 257 : b->count <= 32768 ? 4093 : 16381;
 	uint64_t bytes = HEADER + buckets * 8u;
@@ -179,7 +179,7 @@ static scws_status_t serialize(builder *b, unsigned char **out, uint32_t *size)
 		if (used && !strcmp(b->entries[used - 1].key, current->key)) {
 			entry *previous = &b->entries[used - 1];
 			uint32_t flags = previous->flags | current->flags;
-			if (current->flags & SCWS_WORD_SEARCH) {
+			if (current->flags & SCWS2_WORD_SEARCH) {
 				previous->cost = current->cost; memcpy(previous->pos, current->pos, 3);
 			}
 			previous->flags = flags;
@@ -190,11 +190,11 @@ static scws_status_t serialize(builder *b, unsigned char **out, uint32_t *size)
 	for (size_t i = 0; i < used; i++) {
 		b->entries[i].offset = (uint32_t) bytes;
 		bytes += 27u + b->entries[i].length;
-		if (bytes + TRAILER > MAX_BYTES) return SCWS_ELIMIT;
+		if (bytes + TRAILER > MAX_BYTES) return SCWS2_ELIMIT;
 	}
 	bytes += TRAILER;
 	data = calloc(1, (size_t) bytes);
-	if (!data) return SCWS_ENOMEM;
+	if (!data) return SCWS2_ENOMEM;
 	memcpy(data, "XDB2", 4); put32(data + 4, 4); put32(data + 8, HEADER);
 	put32(data + 16, BASE); put32(data + 20, buckets); put32(data + 24, (uint32_t) used);
 	put32(data + 28, (uint32_t) bytes); put32(data + 32, 10);
@@ -212,36 +212,36 @@ static scws_status_t serialize(builder *b, unsigned char **out, uint32_t *size)
 	}
 	memcpy(data + bytes - TRAILER, "XDB2END\n", TRAILER);
 	*out = data; *size = (uint32_t) bytes;
-	return SCWS_OK;
+	return SCWS2_OK;
 }
-scws_status_t scws_text_load(const char *path, unsigned char **data, uint32_t *size)
+scws2_status_t scws2_text_load(const char *path, unsigned char **data, uint32_t *size)
 {
 	FILE *input;
 	builder b = {NULL, 0, 0};
 	char line[4096];
 	size_t length = 0, total = 0;
 	int ch, first = 1;
-	scws_status_t status = SCWS_OK;
-	if (!path || !data || !size) return SCWS_EINVAL;
+	scws2_status_t status = SCWS2_OK;
+	if (!path || !data || !size) return SCWS2_EINVAL;
 	*data = NULL; *size = 0;
 	input = fopen(path, "rb");
-	if (!input) return SCWS_EIO;
+	if (!input) return SCWS2_EIO;
 	while ((ch = fgetc(input)) != EOF) {
-		if (++total > MAX_BYTES) { status = SCWS_ELIMIT; break; }
-		if (!ch) { status = SCWS_EFORMAT; break; }
+		if (++total > MAX_BYTES) { status = SCWS2_ELIMIT; break; }
+		if (!ch) { status = SCWS2_EFORMAT; break; }
 		if (ch == '\n') {
 			status = parse_line(&b, line, length, first);
 			if (status) break;
 			length = 0; first = 0;
 		} else {
-			if (length == sizeof(line) - 1) { status = SCWS_ELIMIT; break; }
+			if (length == sizeof(line) - 1) { status = SCWS2_ELIMIT; break; }
 			line[length++] = (char) ch;
 		}
 	}
-	if (!status && ferror(input)) status = SCWS_EIO;
+	if (!status && ferror(input)) status = SCWS2_EIO;
 	if (!status && length) status = parse_line(&b, line, length, first);
-	if (fclose(input) && !status) status = SCWS_EIO;
-	if (!status) status = b.count ? serialize(&b, data, size) : SCWS_EFORMAT;
+	if (fclose(input) && !status) status = SCWS2_EIO;
+	if (!status) status = b.count ? serialize(&b, data, size) : SCWS2_EFORMAT;
 	for (size_t i = 0; i < b.count; i++) free(b.entries[i].key);
 	free(b.entries);
 	return status;

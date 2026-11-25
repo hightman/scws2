@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SCWS 2 dictionary acquisition, preparation and independent XDB2 validation."""
+"""scws2 dictionary acquisition, preparation and independent XDB2 validation."""
 import argparse
 import csv
 import hashlib

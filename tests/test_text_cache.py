@@ -22,8 +22,8 @@ class TextCacheTests(unittest.TestCase):
         flags = ['-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + shlex.split(os.environ.get('CORE_TEST_CFLAGS', '-O2'))
         includes = ['-I' + str(ROOT / p) for p in ('include', 'src')] + ['-I' + str(cls.bin)]
         sources = [str(ROOT / p) for p in ('src/text.c', 'src/text_cache.c', 'src/utf8.c', 'src/rules.c', 'tests/cache_api.c')]
-        for name, definitions in [('normal', []), ('no-mmap', ['-DSCWS_NO_MMAP']),
-                                  ('no-cache', ['-DSCWS_NO_TEXT_CACHE'])]:
+        for name, definitions in [('normal', []), ('no-mmap', ['-DSCWS2_NO_MMAP']),
+                                  ('no-cache', ['-DSCWS2_NO_TEXT_CACHE'])]:
             subprocess.run(cc + flags + definitions + includes + sources + ['-o', str(cls.bin / name)], check=True)
         cls.large = cls.bin / 'large.txt'
         cls.large.write_text(''.join(f'条目{i:05d}词 n\n' for i in range(20000)), encoding='utf-8')
@@ -49,7 +49,7 @@ class TextCacheTests(unittest.TestCase):
         return [int(line) for line in result.stdout.splitlines()]
 
     def cached(self):
-        return list(self.root.glob('scws-text-*/*.xdb'))
+        return list(self.root.glob('scws2-text-*/*.xdb'))
 
     def test_reuses_cache_across_processes_and_normalizes_path(self):
         self.assertEqual(self.load(), [0])

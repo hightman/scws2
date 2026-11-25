@@ -1,4 +1,4 @@
-/* SCWS 2 dictionary compiler. Distributed under the repository BSD license.
+/* scws2 dictionary compiler. Distributed under the repository BSD license.
  * No third-party dependencies. See dict/FORMAT.md for the byte-level format.
  */
 #include <errno.h>

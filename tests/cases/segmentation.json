@@ -1,5 +1,5 @@
 {
-  "description": "SCWS 2 分词基线：同一句分别比较 standard 与 search；第 7 句保留已知主路径缺陷。",
+  "description": "scws2 分词基线：同一句分别比较 standard 与 search；第 7 句保留已知主路径缺陷。",
   "cases": [
     {
       "id": "case-01-standard",

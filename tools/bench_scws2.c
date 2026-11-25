@@ -1,6 +1,6 @@
-/* Native, single-thread segmentation benchmark for SCWS 2. */
+/* Native, single-thread segmentation benchmark for scws2. */
 #define _POSIX_C_SOURCE 200809L
-#include "scws.h"
+#include "scws2.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,15 +19,15 @@ static double now(void)
 	if (clock_gettime(CLOCK_MONOTONIC, &ts)) fail("clock_gettime failed");
 	return (double) ts.tv_sec + (double) ts.tv_nsec / 1e9;
 }
-static scws_mode_t output_mode = SCWS_STANDARD;
+static scws2_mode_t output_mode = SCWS2_STANDARD;
 
-static size_t segment(scws_t ctx, const sentence *line, int dump)
+static size_t segment(scws2_t ctx, const sentence *line, int dump)
 {
 	size_t count = 0;
-	const scws_token_t *token;
-	scws_result_t result = scws_segment(ctx, line->text, line->size, output_mode);
-	if (!result) fail(scws_strerror(ctx));
-	while ((token = scws_result_next(result)) != NULL) {
+	const scws2_token_t *token;
+	scws2_result_t result = scws2_segment(ctx, line->text, line->size, output_mode);
+	if (!result) fail(scws2_strerror(ctx));
+	while ((token = scws2_result_next(result)) != NULL) {
 		if (dump) {
 			if (count) putchar(' ');
 			if (dump == 2) printf("%zu:%zu", token->offset, token->length);
@@ -35,7 +35,7 @@ static size_t segment(scws_t ctx, const sentence *line, int dump)
 		}
 		count++;
 	}
-	scws_result_free(result);
+	scws2_result_free(result);
 	if (dump) putchar('\n');
 	return count;
 }
@@ -47,10 +47,10 @@ int main(int argc, char **argv)
 	size_t count = 0, capacity = 0, bytes = 0, tokens = 0;
 	long iterations;
 	double start, elapsed;
-	scws_t ctx;
+	scws2_t ctx;
 	if (argc != 5 && argc != 6) fail("Usage: bench dict corpus iterations memory|mmap [standard|search]");
 	if (argc == 6) {
-		if (!strcmp(argv[5], "search")) output_mode = SCWS_SEARCH;
+		if (!strcmp(argv[5], "search")) output_mode = SCWS2_SEARCH;
 		else if (strcmp(argv[5], "standard")) fail("invalid segmentation mode");
 	}
 	iterations = strtol(argv[3], &end, 10);
@@ -76,10 +76,10 @@ int main(int argc, char **argv)
 	}
 	if (ferror(fp) || !count) fail("cannot read corpus");
 	fclose(fp); free(buffer);
-	ctx = scws_new();
+	ctx = scws2_new();
 	if (!ctx) fail("out of memory");
-	if (scws_set_dict(ctx, argv[1], !strcmp(argv[4], "memory") ? 0 : SCWS_DICT_MMAP)
-		|| scws_set_options(ctx, SCWS_KEEP_SYMBOLS)) fail("cannot configure dictionary");
+	if (scws2_set_dict(ctx, argv[1], !strcmp(argv[4], "memory") ? 0 : SCWS2_DICT_MMAP)
+		|| scws2_set_options(ctx, SCWS2_KEEP_SYMBOLS)) fail("cannot configure dictionary");
 	/* One warm-up; corpus/dictionary loading and output formatting excluded. */
 	if (iterations > 0) for (size_t i = 0; i < count; i++) segment(ctx, &lines[i], 0);
 	start = now();
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 	elapsed = now() - start;
 	if (iterations > 0) printf("{\"seconds\":%.9f,\"iterations\":%ld,\"bytes\":%zu,\"tokens\":%zu}\n",
 		elapsed, iterations, bytes, tokens);
-	scws_free(ctx);
+	scws2_free(ctx);
 	for (size_t i = 0; i < count; i++) free(lines[i].text);
 	free(lines);
 	return ferror(stdout) ? 2 : 0;

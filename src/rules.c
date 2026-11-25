@@ -7,7 +7,7 @@ static int member(const uint32_t *set, uint32_t ch)
 	for (; *set; set++) if (*set == ch) return 1;
 	return 0;
 }
-int scws_rule_symbol(uint32_t ch) { return member(rule_symbol, ch); }
+int scws2_rule_symbol(uint32_t ch) { return member(rule_symbol, ch); }
 static int numeric(uint32_t ch)
 {
 	return member(rule_chnum0, ch) || member(rule_chnum1, ch)
@@ -16,7 +16,7 @@ static int numeric(uint32_t ch)
 static int digit(uint32_t ch)
 {
 	if (!numeric(ch)) return -1;
-	if (scws_digit(ch)) return (int) (ch - '0');
+	if (scws2_digit(ch)) return (int) (ch - '0');
 	switch (ch) {
 		case 0x96f6: case 0x3007: return 0; /* 零〇 */
 		case 0x4e00: case 0x58f9: return 1; /* 一壹 */
@@ -45,7 +45,7 @@ static int rank(uint32_t ch)
 		default: return 0;
 	}
 }
-static size_t measure(const scws_unit *units, size_t count, size_t from)
+static size_t measure(const scws2_unit *units, size_t count, size_t from)
 {
 	size_t best = from;
 	for (size_t i = 0; rule_units[i][0]; i++) {
@@ -55,17 +55,17 @@ static size_t measure(const scws_unit *units, size_t count, size_t from)
 	}
 	return best;
 }
-static int integer(const scws_unit *units, size_t from, size_t to)
+static int integer(const scws2_unit *units, size_t from, size_t to)
 {
-	int all_digits = 1, arabic = scws_digit(units[from].ch);
+	int all_digits = 1, arabic = scws2_digit(units[from].ch);
 	int pending = 0, zero = 0, section = 0, any = 0, small = 4, big = 13;
 	if (arabic) {
 		size_t i = from;
-		while (i < to && scws_digit(units[i].ch)) i++;
+		while (i < to && scws2_digit(units[i].ch)) i++;
 		return i == to || (i + 1 == to && rank(units[i].ch) >= 4);
 	}
 	for (size_t i = from; i < to; i++) {
-		if (scws_digit(units[i].ch)) return 0;
+		if (scws2_digit(units[i].ch)) return 0;
 		if (digit(units[i].ch) < 0) all_digits = 0;
 	}
 	if (all_digits) {
@@ -93,13 +93,13 @@ static int integer(const scws_unit *units, size_t from, size_t to)
 	}
 	return !zero && (any || pending);
 }
-void scws_rule_numbers(scws_unit *units, size_t count)
+void scws2_rule_numbers(scws2_unit *units, size_t count)
 {
 	for (size_t i = 0; i < count; i++) {
 		size_t from = i, end, integer_end, quantity;
 		int prefix = member(rule_chnum5, units[i].ch), decimal = 0;
 		if (i && (numeric(units[i - 1].ch) || member(rule_chnum5, units[i - 1].ch)
-			|| scws_alpha(units[i - 1].ch))) continue;
+			|| scws2_alpha(units[i - 1].ch))) continue;
 		if (i > 1 && member(rule_chnum3, units[i - 1].ch) && numeric(units[i - 2].ch)) continue;
 		if (prefix) from++;
 		if (from == count || !numeric(units[from].ch)) continue;
@@ -111,10 +111,10 @@ void scws_rule_numbers(scws_unit *units, size_t count)
 		}
 		integer_end = end;
 		if (end < count && member(rule_chnum3, units[end].ch) && end + 1 < count && digit(units[end + 1].ch) >= 0) {
-			int arabic = scws_digit(units[from].ch);
+			int arabic = scws2_digit(units[from].ch);
 			if (arabic && rank(units[integer_end - 1].ch)) continue; /* 3万.5 is not a decimal. */
 			size_t start = ++end;
-			while (end < count && digit(units[end].ch) >= 0 && !!scws_digit(units[end].ch) == arabic) end++;
+			while (end < count && digit(units[end].ch) >= 0 && !!scws2_digit(units[end].ch) == arabic) end++;
 			if (end == start) continue;
 			decimal = 1;
 			if (end < count && rank(units[end].ch) >= 4) end++;
@@ -122,10 +122,10 @@ void scws_rule_numbers(scws_unit *units, size_t count)
 		if (!integer(units, from, integer_end)) continue;
 		quantity = measure(units, count, end);
 		/* Reject malformed runs rather than recognizing a valid-looking prefix. */
-		if (end < count && ((numeric(units[end].ch) && quantity == end) || scws_alpha(units[end].ch))) continue;
+		if (end < count && ((numeric(units[end].ch) && quantity == end) || scws2_alpha(units[end].ch))) continue;
 		if (end < count && member(rule_chnum3, units[end].ch) && end + 1 < count && numeric(units[end + 1].ch)) continue;
 		if (prefix && units[i].ch == 0x6bcf && quantity == end) continue; /* 每 requires a unit. */
-		if (!prefix && !decimal && end == from + 1 && !scws_digit(units[from].ch) && quantity == end) continue;
+		if (!prefix && !decimal && end == from + 1 && !scws2_digit(units[from].ch) && quantity == end) continue;
 		units[i].number_from = from;
 		units[i].number_to = end;
 		units[i].quantity_to = quantity;

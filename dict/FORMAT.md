@@ -1,7 +1,7 @@
 # XDB2 dictionary format, version 4
 
 All integers are unsigned little-endian values. No native C structures or floats
-are serialized. The extension remains `.xdb`; this is a new SCWS 2 format,
+are serialized. The extension remains `.xdb`; this is a new scws2 format,
 not a drop-in SCWS 1 XDB. The header deliberately makes the legacy reader's
 file-size check fail. Readers must check magic and schema before reading nodes.
 
