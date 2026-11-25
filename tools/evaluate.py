@@ -98,7 +98,7 @@ def compile_engine(output, cc):
     run([sys.executable, '-B', ROOT / 'tools/gen_rules.py', '--output', output / 'rules_data.h'])
     command = cc + ['-O2', '-std=c11', '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src'),
                     '-I' + str(output)]
-    command += [str(ROOT / 'src' / name) for name in ('scws.c', 'utf8.c', 'xdb.c', 'rules.c')]
+    command += [str(ROOT / 'src' / name) for name in ('scws.c', 'utf8.c', 'xdb.c', 'text.c', 'rules.c')]
     binary = output / 'bench-scws'
     command += [str(ROOT / 'tools/bench_scws.c'), '-o', str(binary)]
     result = subprocess.run(command, capture_output=True)

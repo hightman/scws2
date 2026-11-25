@@ -47,6 +47,8 @@ printf '南京市长江大桥\n' | build/scws -d build/dict/dictionary.xdb
 
 只有显式 `fetch` 联网，构建和测试不会自动下载词典。构建生成静态库、共享库、CLI 和词典编译器。`make install PREFIX=/path/to/prefix` 安装库、头文件和工具，不自动安装下载词典。
 
+CLI 的 `-d file.txt` 按文本词典加载（扩展名大小写不敏感）；任意文件名可用 `--text-dict file` 显式指定。可重复 `-d` / `--text-dict` 叠加词典，后加载的同词定义优先。
+
 CLI 可不传 `-d`，此时仅使用内置规则和未知字符兜底。默认读取全部标准输入，以 TSV 输出字节跨度、字符跨度、词性、种类、来源和原词。`--search` 增加检索补词，`--bigrams` 可在搜索模式开启未知汉字二元兜底，`--symbols` 保留符号。
 
 ## 分词用例对照
@@ -63,6 +65,8 @@ python3 tools/check_segments.py --case case-07-standard --case case-07-search
 ## 词典
 
 词典默认整库加载到内存；C API 先用 `scws_t ctx = scws_new()` 创建上下文，再用 `scws_set_dict(ctx, path, SCWS_DICT_MEMORY)` 加载词典，或传 `SCWS_DICT_MMAP` 选择只读映射；`scws_free(ctx)` 统一释放词典和上下文。`scws_segment()` 返回独立的 `scws_result_t`，用 `scws_result_next()` 遍历、`scws_result_free()` 释放，可嵌套分词；结果在 ctx 释放后仍有效。契约见 [API.md](API.md)。映射模式不自动回退到内存加载。
+
+运行时可用 `scws_add_dict(ctx, "user.txt", SCWS_DICT_TEXT)` 加载 UTF-8 自定义词表。一行一个词，支持空格/Tab 分隔的 `词条 词频 词性` 或 `词条 词性 词频`；缺省词性为 `un`，缺省及 `0` 词频按最低值 `1` 处理。文本加载后使用内存查询，完整格式及权重说明见 [API.md](API.md#文本词典)。
 
 当前唯一接入的上游是 jieba 标准词典，THUOCL 尚未融入。词性最多两个 ASCII 字符，`nrt`、`nrfg` 在加工时归并为 `nr`，缺失时为空；词性不参与切分评分。
 

@@ -1,6 +1,8 @@
 """Behavioral tests against the real C library, CLI and independent XDB builder."""
 import os
 import json
+import math
+import importlib.util
 from pathlib import Path
 import random
 import shlex
@@ -21,13 +23,14 @@ class CoreTests(unittest.TestCase):
         cls.compiler = cls.root / 'scws2-dict'
         cls.api = cls.root / 'api-test'
         cls.no_mmap_api = cls.root / 'api-no-mmap-test'
+        cls.text_compiler = cls.root / 'text-compiler-test'
         subprocess.run([os.sys.executable, '-B', str(ROOT / 'tools/gen_rules.py'),
                         '--output', str(cls.root / 'rules_data.h')], check=True)
         cc = shlex.split(os.environ.get('CC', 'cc'))
         flags = ['-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + shlex.split(os.environ.get('CORE_TEST_CFLAGS', '-O2'))
-        source = [str(ROOT / name) for name in ('src/scws.c', 'src/utf8.c', 'src/xdb.c', 'src/rules.c')]
+        source = [str(ROOT / name) for name in ('src/scws.c', 'src/utf8.c', 'src/xdb.c', 'src/text.c', 'src/rules.c')]
         includes = ['-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src'), '-I' + str(cls.root)]
-        for main, output, extra in [('cli/scws.c', cls.cli, []), ('tests/core_api.c', cls.api, ['-pthread'])]:
+        for main, output, extra in [('cli/scws.c', cls.cli, []), ('tests/core_api.c', cls.api, ['-pthread']), ('tests/text_dict.c', cls.text_compiler, [])]:
             subprocess.run(cc + flags + includes + source + [str(ROOT / main), '-o', str(output)] + extra, check=True)
         subprocess.run(cc + flags + includes + ['-DSCWS_NO_MMAP'] + source
                        + [str(ROOT / 'tests/core_api.c'), '-pthread', '-o', str(cls.no_mmap_api)], check=True)
@@ -149,6 +152,73 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(tokens[-1]['offset'], 299 * 6)
         token = self.invoke('a' * 100000)[0]
         self.assertEqual((token['length'], token['char_length']), (100000, 100000))
+
+    def text_dictionary(self, content, name='user.txt'):
+        path = self.root / name
+        path.write_bytes(content if isinstance(content, bytes) else content.encode())
+        return path
+
+    def test_text_dictionary_field_defaults_orders_and_prefixes(self):
+        path = self.text_dictionary('\ufeff# comment\r\n; comment\r\n\r\n素词\r\n低频 0\n'
+                                    '兼容词 100 nz\n倒序词\tnr\t100\n标注词 vn\n'
+                                    '长标签 2 nrt\n另一标签 nrfg 3\n𠀀词 2 n\n'
+                                    '重复词 5 n\n重复词 0 nz\n前缀 0 n\n前缀长词 2 n')
+        expected = {'素词': 'un', '低频': 'un', '兼容词': 'nz', '倒序词': 'nr', '标注词': 'vn',
+                    '长标签': 'nr', '另一标签': 'nr', '𠀀词': 'n', '重复词': 'nz', '前缀长词': 'n'}
+        for word, pos in expected.items():
+            with self.subTest(word=word):
+                tokens = self.invoke(word, dictionary=path)
+                self.assertEqual([(t['word'], t['pos']) for t in tokens], [(word, pos)])
+        raw = self.root / 'raw-blobs.xdb'
+        result = subprocess.run([str(self.text_compiler), str(path), str(raw)], capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
+        spec = importlib.util.spec_from_file_location('text_dictionary_check', ROOT / 'dict/build.py')
+        validator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(validator)
+        validator.check_xdb(raw)
+        self.assertEqual(self.invoke('前缀长词', dictionary=raw), self.invoke('前缀长词', dictionary=path))
+        explicit = self.text_dictionary('特殊词', 'custom.data')
+        result = self.invoke('特殊词', '--text-dict', str(explicit))
+        self.assertEqual([(t['word'], t['pos']) for t in result], [('特殊词', 'un')])
+
+    def test_text_frequency_calibration_is_independent_of_file_size(self):
+        rng = random.Random(4549)
+        frequencies = [0, 1, 2, 3, 65536, 0xffffffff] + [rng.randrange(1, 70000000) for _ in range(100)]
+        path = self.text_dictionary(''.join(f'词{i} {freq} n\n' for i, freq in enumerate(frequencies)))
+        raw = self.root / 'costs.xdb'
+        subprocess.run([str(self.text_compiler), str(path), str(raw)], check=True, capture_output=True)
+        data = raw.read_bytes()
+        offset = 64 + struct.unpack_from('<I', data, 20)[0] * 8
+        found = {}
+        for _ in range(struct.unpack_from('<I', data, 24)[0]):
+            size = data[offset + 16]
+            key = data[offset + 17:offset + 17 + size].decode()
+            cost, flags = struct.unpack_from('<II', data, offset + 17 + size)
+            if flags & 2:
+                found[key] = cost
+            offset += 27 + size
+        for i, frequency in enumerate(frequencies):
+            expected = max(0, math.floor(18432 - math.log(max(frequency, 1)) * 1024 + 0.5))
+            self.assertEqual(found[f'词{i}'], expected)
+        single = self.text_dictionary('兼容词 100 nz', 'single.txt')
+        multiple = self.text_dictionary('兼容词 100 nz\n其它词 1 n', 'multiple.txt')
+        self.assertEqual(self.invoke('兼容词', dictionary=single), self.invoke('兼容词', dictionary=multiple))
+
+    def test_malformed_text_dictionary_is_rejected(self):
+        invalid = [b'', b'# only comment\n', b'word 1 n extra\n', b'word -1 n\n',
+                   b'word 4294967296 n\n', b'word 1.2 n\n', b'word 1 unsupported\n',
+                   b'word 1 9\n', b'\xff\n', b'word\0junk\n', b'x' * 241 + b'\n',
+                   b'x' * 4096 + b'\n', '词\u3000词\n'.encode()]
+        for number, content in enumerate(invalid):
+            with self.subTest(number=number):
+                path = self.text_dictionary(content)
+                self.invoke('中文', dictionary=path, success=False)
+        path = self.text_dictionary('素词\n中国 0 nz\n新词甲 100000000 n')
+        malformed = self.text_dictionary('word 2 n\nbad -1 n', 'malformed.txt')
+        for api in (self.api, self.no_mmap_api):
+            result = subprocess.run([str(api), str(self.dictionary), 'text-result', str(path), str(malformed)],
+                                    capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
 
     def test_native_api_lifecycle_errors_and_owned_dictionaries(self):
         result = subprocess.run([str(self.api), str(self.dictionary), str(self.overlay)], capture_output=True, timeout=15)

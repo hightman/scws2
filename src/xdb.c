@@ -91,7 +91,17 @@ scws_status_t scws_dict_open_ex(const char *path, scws_dict_mode_t mode, scws_di
 	scws_status_t status;
 	if (!out) return SCWS_EINVAL;
 	*out = NULL;
-	if (!path || (mode != SCWS_DICT_MEMORY && mode != SCWS_DICT_MMAP)) return SCWS_EINVAL;
+	if (!path || (mode != SCWS_DICT_MEMORY && mode != SCWS_DICT_MMAP && mode != SCWS_DICT_TEXT)) return SCWS_EINVAL;
+	if (mode == SCWS_DICT_TEXT) {
+		dict = calloc(1, sizeof(*dict));
+		if (!dict) return SCWS_ENOMEM;
+		dict->mode = SCWS_DICT_TEXT;
+		status = scws_text_load(path, &dict->data, &dict->size);
+		if (!status) status = validate(dict);
+		if (status) { scws_dict_close(dict); return status; }
+		*out = dict;
+		return SCWS_OK;
+	}
 #ifndef SCWS_HAVE_MMAP
 	if (mode == SCWS_DICT_MMAP) return SCWS_ENOTSUP;
 #endif

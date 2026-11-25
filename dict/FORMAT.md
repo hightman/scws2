@@ -14,7 +14,7 @@ file-size check fail. Readers must check magic and schema before reading nodes.
 | 8 | 4 | Header length, 64 |
 | 12 | 4 | Required features, 0 |
 | 16 | 4 | Hash base, `0x000f422f` |
-| 20 | 4 | Bucket count, 16381 for the current compiler |
+| 20 | 4 | Bucket count, 16381 for the offline compiler; adaptive for runtime text |
 | 24 | 4 | Unique node count, including prefix-only entries |
 | 28 | 4 | Exact file length, at most `INT32_MAX` in this version |
 | 32 | 4 | Fixed value length, 10 (cost, flags, POS) |
@@ -77,8 +77,9 @@ each sorted subrange. There are no gaps or timestamps. The final node is
 followed by the fixed
 8-byte ASCII trailer `XDB2END\n` (hex `58 44 42 32 45 4e 44 0a`).
 The header file length includes this trailer; no bytes may follow it.
-Input order does not affect binary output. The compiler rejects duplicate
-whole terms; repeated generated prefixes are merged.
+The offline compiler rejects duplicate whole terms, and input order does not
+affect its output. The runtime text loader uses the last definition for duplicate
+whole terms. Both merge repeated generated prefixes and emit this same schema.
 
 ## Validation and evolution
 

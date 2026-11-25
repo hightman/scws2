@@ -16,7 +16,7 @@ else
 SHARED = build/libscws.so
 SHARED_FLAGS = -shared
 endif
-OBJECTS = build/scws.o build/utf8.o build/xdb.o build/rules.o
+OBJECTS = build/scws.o build/utf8.o build/xdb.o build/text.o build/rules.o
 
 .PHONY: all check test cases check-cases fetch-eval eval dict rules install clean
 all: build/libscws.a $(SHARED) build/scws build/scws2-dict

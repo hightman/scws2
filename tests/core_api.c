@@ -167,6 +167,30 @@ static int nested_results(const char *base, const char *overlay, scws_dict_mode_
 	return 0;
 }
 
+static int text_ownership(const char *base, const char *text, const char *malformed)
+{
+	scws_t ctx = scws_new();
+	scws_result_t before, after;
+	CHECK(ctx && scws_set_dict(ctx, base, SCWS_DICT_MEMORY) == SCWS_OK);
+	before = scws_segment(ctx, "中国", 6, SCWS_STANDARD);
+	CHECK(before && !strcmp(scws_result_next(before)->pos, "ns"));
+	CHECK(scws_add_dict(ctx, text, SCWS_DICT_TEXT) == SCWS_OK);
+	after = scws_segment(ctx, "中国素词新词甲", strlen("中国素词新词甲"), SCWS_STANDARD);
+	CHECK(after && scws_result_count(after) == 3);
+	CHECK(!strcmp(scws_result_next(after)->pos, "nz"));
+	CHECK(!strcmp(scws_result_next(after)->pos, "un"));
+	CHECK(!strcmp(scws_result_next(after)->pos, "n"));
+	CHECK(scws_set_dict(ctx, malformed, SCWS_DICT_TEXT) == SCWS_EFORMAT);
+	CHECK(scws_add_dict(ctx, malformed, SCWS_DICT_TEXT) == SCWS_EFORMAT);
+	CHECK(expect_result(ctx, "中国", 6, SCWS_STANDARD, 1, 6) == 0);
+	CHECK(scws_set_dict(ctx, text, SCWS_DICT_TEXT) == SCWS_OK);
+	CHECK(expect_result(ctx, "研究生命起源", 18, SCWS_STANDARD, 6, 3) == 0);
+	scws_free(ctx);
+	CHECK(scws_result_count(before) == 1 && scws_result_count(after) == 3);
+	scws_result_free(before); scws_result_free(after);
+	return 0;
+}
+
 #ifndef SCWS_NO_MMAP
 static int compare_modes(const char *path, const char *overlay)
 {
@@ -222,6 +246,9 @@ int main(int argc, char **argv)
 	scws_t ctx = scws_new();
 	CHECK(ctx);
 	CHECK(argc >= 2);
+	if (argc == 5 && !strcmp(argv[2], "text-result")) {
+		scws_free(ctx); return text_ownership(argv[1], argv[3], argv[4]);
+	}
 	CHECK(scws_set_dict(ctx, argv[1], (scws_dict_mode_t) 99) == SCWS_EINVAL);
 	CHECK(scws_error_code(ctx) == SCWS_EINVAL && !strcmp(scws_strerror(ctx), "invalid argument"));
 #ifndef SCWS_NO_MMAP

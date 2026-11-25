@@ -3,9 +3,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int text_path(const char *path)
+{
+	size_t length = strlen(path);
+	const char *p;
+	if (length < 4) return 0;
+	p = path + length - 4;
+	return p[0] == '.' && (p[1] == 't' || p[1] == 'T')
+		&& (p[2] == 'x' || p[2] == 'X') && (p[3] == 't' || p[3] == 'T');
+}
 static void usage(FILE *fp)
 {
-	fputs("Usage: scws [-d dictionary.xdb] [-d overlay.xdb] [--search] [--bigrams] [--symbols] [-i text]\n"
+	fputs("Usage: scws [-d dictionary.xdb|dictionary.txt] [--text-dict file] [--search] [--bigrams] [--symbols] [-i text]\n"
 		"UTF-8 only. Without -i, read stdin. Output: byte_offset, byte_length, char_offset,\n"
 		"char_length, POS, kind, origin, original token (tab-separated).\n", fp);
 }
@@ -28,8 +37,9 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[i], "--bigrams")) flags |= SCWS_FALLBACK_BIGRAM;
 		else if (!strcmp(argv[i], "--symbols")) flags |= SCWS_KEEP_SYMBOLS;
 		else if (!strcmp(argv[i], "-i") && i + 1 < argc) input = argv[++i];
-		else if (!strcmp(argv[i], "-d") && i + 1 < argc) {
-			status = scws_add_dict(ctx, argv[++i], SCWS_DICT_MEMORY);
+		else if ((!strcmp(argv[i], "-d") || !strcmp(argv[i], "--text-dict")) && i + 1 < argc) {
+			int text = !strcmp(argv[i], "--text-dict") || text_path(argv[i + 1]);
+			status = scws_add_dict(ctx, argv[++i], text ? SCWS_DICT_TEXT : SCWS_DICT_MEMORY);
 			if (status) { fprintf(stderr, "%s: %s\n", argv[i], scws_strerror(ctx)); goto done; }
 		} else { usage(stderr); goto done; }
 	}
