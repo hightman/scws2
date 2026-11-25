@@ -36,7 +36,7 @@ $(SHARED): $(OBJECTS)
 build/scws: cli/scws.c build/libscws.a include/scws.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) cli/scws.c build/libscws.a $(LDFLAGS) -o $@
 
-build/scws2-dict: tools/scws2-dict.c | build
+build/scws2-dict: cli/scws2-dict.c | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) $< $(LDFLAGS) -o $@
 
 check test: all
@@ -47,7 +47,7 @@ rules:
 	$(PYTHON) -B tools/gen_rules.py --output build/rules_data.h
 
 dict: build/scws2-dict
-	$(PYTHON) -B tools/dict.py build
+	$(PYTHON) -B dict/build.py build
 
 install: all
 	install -d $(DESTDIR)$(PREFIX)/include $(DESTDIR)$(PREFIX)/lib $(DESTDIR)$(PREFIX)/bin

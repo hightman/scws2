@@ -27,7 +27,7 @@ class CoreTests(unittest.TestCase):
         includes = ['-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src'), '-I' + str(cls.root)]
         for main, output, extra in [('cli/scws.c', cls.cli, []), ('tests/core_api.c', cls.api, ['-pthread'])]:
             subprocess.run(cc + flags + includes + source + [str(ROOT / main), '-o', str(output)] + extra, check=True)
-        subprocess.run(cc + flags + [str(ROOT / 'tools/scws2-dict.c'), '-o', str(cls.compiler)], check=True)
+        subprocess.run(cc + flags + [str(ROOT / 'cli/scws2-dict.c'), '-o', str(cls.compiler)], check=True)
         cls.dictionary = cls.build('base', [
             ('研究', 100, 3, 'v'), ('研究生', 50, 3, 'n'), ('生命', 100, 3, 'n'),
             ('命', 500, 3, 'n'), ('起源', 100, 3, 'n'), ('南京', 150, 3, 'ns'),

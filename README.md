@@ -23,8 +23,8 @@ make -j2
 make check
 
 # 首次使用：下载锁定的词典源并构建 XDB2
-python3 tools/dict.py fetch
-python3 tools/dict.py build
+python3 dict/build.py fetch
+python3 dict/build.py build
 
 build/scws -d build/dict/dictionary.xdb --search -i '中文分词测试'
 printf '南京市长江大桥\n' | build/scws -d build/dict/dictionary.xdb

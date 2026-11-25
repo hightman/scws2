@@ -1,6 +1,12 @@
 # SCWS 2 词典
 
-目前交付的是可复现的基础词典构建链路；尚未完成检索质量评估，不能视为正式 2.0 词典。核心分词库与 PHP 扩展随后开发，旧版程序不能加载本目录生成的 XDB2。
+目前交付的是可复现的基础词典构建链路；尚未完成检索质量评估，不能视为正式 2.0 词典。核心库和 CLI 已有可运行原型，PHP 扩展尚未实现；旧版程序不能加载本目录生成的 XDB2。
+
+## 维护入口
+
+本目录集中维护词典流水线及其输入：`build.py` 提供下载、加工、构建、校验和差异报告；`sources.lock.json` 锁定来源，`overrides.tsv` 保存人工修订，`jieba.LICENSE` 保存数据许可，`FORMAT.md` 定义 XDB2 格式。
+
+通用纯 C 词典编译器位于 `cli/scws2-dict.c`。原始下载保存在 `.cache/dict/`，构建产物保存在 `build/dict/`；两者均不进入 Git，不混入本目录。
 
 ## 构建
 
@@ -8,10 +14,10 @@
 
 ```sh
 mkdir -p build
-cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror tools/scws2-dict.c -o build/scws2-dict
-python3 tools/dict.py fetch
-python3 tools/dict.py build
-python3 tools/dict.py check build/dict/dictionary.xdb
+cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror cli/scws2-dict.c -o build/scws2-dict
+python3 dict/build.py fetch
+python3 dict/build.py build
+python3 dict/build.py check build/dict/dictionary.xdb
 python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
 ```
 
@@ -52,8 +58,8 @@ python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
 
 更新时修改完整 commit 和两个源文件的校验信息，用新缓存目录下载验证；不要覆盖锁定文件后复用不匹配的旧缓存。保留旧快照与输出目录用于比较。先检查新增、删除、频率及切分差异，通过检索评估后再发布；不自动追踪浮动分支、不自动发布。
 
-可用 `python3 tools/dict.py diff build/dict-old build/dict-new` 比较两个加工目录，输出新增、删除、代价、用途与词性变化统计及有限样例；`--limit` 控制样例数。支持比较旧的无词性加工目录与当前四列词表。评分分母随主词集合变化，一次修订可能影响很多词的代价，须结合实际切分差异判断。
+可用 `python3 dict/build.py diff build/dict-old build/dict-new` 比较两个加工目录，输出新增、删除、代价、用途与词性变化统计及有限样例；`--limit` 控制样例数。支持比较旧的无词性加工目录与当前四列词表。评分分母随主词集合变化，一次修订可能影响很多词的代价，须结合实际切分差异判断。
 
-当前没有自动更新锁文件，尚未发行正式词典版本；分词差异评估会在建立核心库后补齐。复现要求相同输入、加工规则与数值行为；极少数处于舍入边界的浮点结果可能受平台影响，发布流水线应固定工具环境并核对输出哈希。后续需要跨平台逐字节验证。
+当前没有自动更新锁文件，尚未发行正式词典版本；后续将结合核心库补充分词与检索差异评估。复现要求相同输入、加工规则与数值行为；极少数处于舍入边界的浮点结果可能受平台影响，发布流水线应固定工具环境并核对输出哈希。后续需要跨平台逐字节验证。
 
 构建先在临时目录完成编译和校验，成功后更新输出文件，清单最后写入。它不是多文件原子发布；服务部署应使用独立版本目录并切换目录引用，不在正在加载的目录直接重建。

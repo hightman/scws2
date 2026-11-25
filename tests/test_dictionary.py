@@ -11,7 +11,7 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location('dictionary', ROOT / 'tools/dict.py')
+SPEC = importlib.util.spec_from_file_location('dictionary', ROOT / 'dict/build.py')
 dictionary = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(dictionary)
 
@@ -24,7 +24,7 @@ class DictionaryTests(unittest.TestCase):
         command = shlex.split(os.environ.get('CC', 'cc'))
         flags = shlex.split(os.environ.get('DICT_TEST_CFLAGS', '-O2'))
         subprocess.run(command + ['-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + flags
-                       + [str(ROOT / 'tools/scws2-dict.c'), '-o', str(cls.compiler)], check=True)
+                       + [str(ROOT / 'cli/scws2-dict.c'), '-o', str(cls.compiler)], check=True)
 
     @classmethod
     def tearDownClass(cls):
@@ -188,7 +188,7 @@ class DictionaryTests(unittest.TestCase):
     def test_cli_build_and_failed_build_preserves_previous_output(self):
         self.fixture()
         out = self.root / 'bundle'
-        command = [os.environ.get('PYTHON', os.sys.executable), str(ROOT / 'tools/dict.py'), 'build',
+        command = [os.environ.get('PYTHON', os.sys.executable), str(ROOT / 'dict/build.py'), 'build',
                    '--lock', str(self.root / 'lock.json'), '--cache', str(self.root),
                    '--overrides', str(self.root / 'overrides.tsv'), '--output', str(out)]
         result = subprocess.run(command + ['--compiler', str(self.compiler)], capture_output=True)
