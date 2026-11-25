@@ -1,0 +1,116 @@
+{
+  "timestamp_utc": "2026-11-25T09:34:48.687254+00:00",
+  "machine": {
+    "system": "Darwin",
+    "release": "27.2.1",
+    "architecture": "arm64",
+    "cpu": "Apple M5 Pro",
+    "memory_bytes": "51539607552",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.4.1.1)",
+    "optimization": "-O2",
+    "threads": 1
+  },
+  "current_revision": "7c5572e2dece466053a4ae506ed97c43ee110373",
+  "corpus": {
+    "source": "https://raw.githubusercontent.com/yuikns/icwb2-data/873a51fa6234c644126d2f2c5c603a97809d2e49/gold/msr_test_gold.utf8",
+    "source_sha256": "cd1a8473841f1b2fcddd14d12599ad8872e6167feb64807af5bac2f6a32cb75d",
+    "sentences": 3985,
+    "gold_words": 106873,
+    "characters": 184355,
+    "utf8_bytes_without_newlines": 552251
+  },
+  "rules_sha256": "f97da443f832bed89e3c46677795d69d147543186f051f069fdd73e6d41d8330",
+  "timing_protocol": "7 interleaved shuffled rounds (seed=0); warm cache; native single thread; median",
+  "results": {
+    "scws-2-standard-memory": {
+      "quality": {
+        "correct_words": 90048,
+        "predicted_words": 103858,
+        "gold_words": 106873,
+        "precision": 0.8670299832463556,
+        "recall": 0.8425701533595951,
+        "f1": 0.854625090755513,
+        "exact_sentences": 620,
+        "overlapping_sentences": 0,
+        "uncovered_characters": 0
+      },
+      "sighan_report": "=== SUMMARY:\n=== TOTAL INSERTIONS:\t3767\n=== TOTAL DELETIONS:\t6782\n=== TOTAL SUBSTITUTIONS:\t10043\n=== TOTAL NCHANGE:\t20592\n=== TOTAL TRUE WORD COUNT:\t106873\n=== TOTAL TEST WORD COUNT:\t103858\n=== TOTAL TRUE WORDS RECALL:\t0.843\n=== TOTAL TEST WORDS PRECISION:\t0.867\n=== F MEASURE:\t0.855\n=== OOV Rate:\t0.025\n=== OOV Recall Rate:\t0.415\n=== IV Recall Rate:\t0.840\n###\tscws-2-standard-memory.utf8\t3767\t6782\t10043\t20592\t106873\t103858\t0.843\t0.867\t0.855\t0.025\t0.415\t0.840",
+      "sighan_quality": {
+        "precision": 0.867,
+        "recall": 0.843,
+        "f1": 0.855
+      },
+      "tokens_per_pass": 103858,
+      "speed": {
+        "iterations_per_sample": 24,
+        "samples": 7,
+        "seconds_per_pass": [
+          0.038032833333333335,
+          0.037580666666666665,
+          0.037695708333333335,
+          0.037985125,
+          0.04519691666666667,
+          0.038138958333333334,
+          0.039930875
+        ],
+        "median_seconds_per_pass": 0.038032833333333335,
+        "mib_per_second": 13.847708644101402,
+        "characters_per_second": 4847259.166421995
+      }
+    },
+    "scws-2-standard-mmap": {
+      "quality": {
+        "correct_words": 90048,
+        "predicted_words": 103858,
+        "gold_words": 106873,
+        "precision": 0.8670299832463556,
+        "recall": 0.8425701533595951,
+        "f1": 0.854625090755513,
+        "exact_sentences": 620,
+        "overlapping_sentences": 0,
+        "uncovered_characters": 0
+      },
+      "tokens_per_pass": 103858,
+      "speed": {
+        "iterations_per_sample": 23,
+        "samples": 7,
+        "seconds_per_pass": [
+          0.03779891304347826,
+          0.042608434782608694,
+          0.03860126086956522,
+          0.043026782608695656,
+          0.038806956521739135,
+          0.04356413043478261,
+          0.037639869565217386
+        ],
+        "median_seconds_per_pass": 0.038806956521739135,
+        "mib_per_second": 13.571473831364123,
+        "characters_per_second": 4750565.788294344
+      }
+    },
+    "scws-2-search-memory": {
+      "quality": null,
+      "tokens_per_pass": 134314,
+      "speed": {
+        "iterations_per_sample": 15,
+        "samples": 7,
+        "seconds_per_pass": [
+          0.07159913333333333,
+          0.06446713333333333,
+          0.06984753333333332,
+          0.06312733333333334,
+          0.06457146666666666,
+          0.06319673333333334,
+          0.0677988
+        ],
+        "median_seconds_per_pass": 0.06457146666666666,
+        "mib_per_second": 8.156351746328637,
+        "characters_per_second": 2855053.6253370945
+      }
+    }
+  },
+  "dictionary": {
+    "sha256": "af9e223bb26f5474b81c236dea3592dcaf96659d32865ace39455db18ee25d9c",
+    "bytes": 17854132
+  }
+}

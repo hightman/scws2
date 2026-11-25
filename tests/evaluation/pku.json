@@ -1,0 +1,116 @@
+{
+  "timestamp_utc": "2026-11-25T09:33:18.730035+00:00",
+  "machine": {
+    "system": "Darwin",
+    "release": "27.2.1",
+    "architecture": "arm64",
+    "cpu": "Apple M5 Pro",
+    "memory_bytes": "51539607552",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.4.1.1)",
+    "optimization": "-O2",
+    "threads": 1
+  },
+  "current_revision": "7c5572e2dece466053a4ae506ed97c43ee110373",
+  "corpus": {
+    "source": "https://raw.githubusercontent.com/yuikns/icwb2-data/873a51fa6234c644126d2f2c5c603a97809d2e49/gold/pku_test_gold.utf8",
+    "source_sha256": "913f78b20b17ea1e154f6246644d7d624b2710641f109a15daee9d63c9fb88d4",
+    "sentences": 1944,
+    "gold_words": 104372,
+    "characters": 172733,
+    "utf8_bytes_without_newlines": 505698
+  },
+  "rules_sha256": "f97da443f832bed89e3c46677795d69d147543186f051f069fdd73e6d41d8330",
+  "timing_protocol": "7 interleaved shuffled rounds (seed=0); warm cache; native single thread; median",
+  "results": {
+    "scws-2-standard-memory": {
+      "quality": {
+        "correct_words": 85599,
+        "predicted_words": 96859,
+        "gold_words": 104372,
+        "precision": 0.8837485416946282,
+        "recall": 0.8201337523473728,
+        "f1": 0.8507536115210877,
+        "exact_sentences": 267,
+        "overlapping_sentences": 0,
+        "uncovered_characters": 0
+      },
+      "sighan_report": "=== SUMMARY:\n=== TOTAL INSERTIONS:\t1342\n=== TOTAL DELETIONS:\t8855\n=== TOTAL SUBSTITUTIONS:\t9916\n=== TOTAL NCHANGE:\t20113\n=== TOTAL TRUE WORD COUNT:\t104372\n=== TOTAL TEST WORD COUNT:\t96859\n=== TOTAL TRUE WORDS RECALL:\t0.820\n=== TOTAL TEST WORDS PRECISION:\t0.884\n=== F MEASURE:\t0.851\n=== OOV Rate:\t0.055\n=== OOV Recall Rate:\t0.690\n=== IV Recall Rate:\t0.824\n###\tscws-2-standard-memory.utf8\t1342\t8855\t9916\t20113\t104372\t96859\t0.820\t0.884\t0.851\t0.055\t0.690\t0.824",
+      "sighan_quality": {
+        "precision": 0.884,
+        "recall": 0.82,
+        "f1": 0.851
+      },
+      "tokens_per_pass": 96859,
+      "speed": {
+        "iterations_per_sample": 23,
+        "samples": 7,
+        "seconds_per_pass": [
+          0.03667204347826087,
+          0.03528447826086956,
+          0.04052156521739131,
+          0.042740521739130434,
+          0.037389130434782605,
+          0.04009695652173913,
+          0.041449521739130434
+        ],
+        "median_seconds_per_pass": 0.04009695652173913,
+        "mib_per_second": 12.027625942047191,
+        "characters_per_second": 4307883.066046432
+      }
+    },
+    "scws-2-standard-mmap": {
+      "quality": {
+        "correct_words": 85599,
+        "predicted_words": 96859,
+        "gold_words": 104372,
+        "precision": 0.8837485416946282,
+        "recall": 0.8201337523473728,
+        "f1": 0.8507536115210877,
+        "exact_sentences": 267,
+        "overlapping_sentences": 0,
+        "uncovered_characters": 0
+      },
+      "tokens_per_pass": 96859,
+      "speed": {
+        "iterations_per_sample": 27,
+        "samples": 7,
+        "seconds_per_pass": [
+          0.04200555555555555,
+          0.036626074074074075,
+          0.03689066666666667,
+          0.03723918518518518,
+          0.03508122222222222,
+          0.03583492592592593,
+          0.03560451851851852
+        ],
+        "median_seconds_per_pass": 0.036626074074074075,
+        "mib_per_second": 13.167428031807143,
+        "characters_per_second": 4716121.079498111
+      }
+    },
+    "scws-2-search-memory": {
+      "quality": null,
+      "tokens_per_pass": 127004,
+      "speed": {
+        "iterations_per_sample": 16,
+        "samples": 7,
+        "seconds_per_pass": [
+          0.0760250625,
+          0.0598339375,
+          0.065502125,
+          0.0656295625,
+          0.061281875,
+          0.0597214375,
+          0.06230175
+        ],
+        "median_seconds_per_pass": 0.06230175,
+        "mib_per_second": 7.740893224636672,
+        "characters_per_second": 2772522.441183434
+      }
+    }
+  },
+  "dictionary": {
+    "sha256": "af9e223bb26f5474b81c236dea3592dcaf96659d32865ace39455db18ee25d9c",
+    "bytes": 17854132
+  }
+}

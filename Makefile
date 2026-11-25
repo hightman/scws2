@@ -4,6 +4,7 @@ PYTHON ?= python3
 PREFIX ?= /usr/local
 CASES ?= tests/cases/segmentation.json
 CASE_DICT ?= build/dict/dictionary.xdb
+EVAL_ARGS ?=
 CFLAGS ?= -O2
 CPPFLAGS += -Iinclude -Isrc -Ibuild
 WARNINGS = -std=c11 -Wall -Wextra -Wpedantic -Werror
@@ -17,7 +18,7 @@ SHARED_FLAGS = -shared
 endif
 OBJECTS = build/scws.o build/utf8.o build/xdb.o build/rules.o
 
-.PHONY: all check test cases check-cases dict rules install clean
+.PHONY: all check test cases check-cases fetch-eval eval dict rules install clean
 all: build/libscws.a $(SHARED) build/scws build/scws2-dict
 
 build:
@@ -51,6 +52,13 @@ cases: build/scws
 
 check-cases: build/scws
 	$(PYTHON) -B tools/check_segments.py --cases "$(CASES)" -d "$(CASE_DICT)"
+
+fetch-eval:
+	$(PYTHON) -B tools/fetch_eval.py
+
+eval: all
+	$(PYTHON) -B tools/evaluate.py --dataset pku $(EVAL_ARGS)
+	$(PYTHON) -B tools/evaluate.py --dataset msr $(EVAL_ARGS)
 
 rules:
 	$(PYTHON) -B tools/gen_rules.py --output build/rules_data.h

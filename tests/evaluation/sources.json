@@ -1,0 +1,42 @@
+{
+  "dataset": "SIGHAN 2005 Bakeoff data release",
+  "mirror_revision": "873a51fa6234c644126d2f2c5c603a97809d2e49",
+  "files": [
+    {
+      "name": "pku_test_gold.utf8",
+      "url": "https://raw.githubusercontent.com/yuikns/icwb2-data/873a51fa6234c644126d2f2c5c603a97809d2e49/gold/pku_test_gold.utf8",
+      "sha256": "913f78b20b17ea1e154f6246644d7d624b2710641f109a15daee9d63c9fb88d4",
+      "bytes": 718331
+    },
+    {
+      "name": "msr_test_gold.utf8",
+      "url": "https://raw.githubusercontent.com/yuikns/icwb2-data/873a51fa6234c644126d2f2c5c603a97809d2e49/gold/msr_test_gold.utf8",
+      "sha256": "cd1a8473841f1b2fcddd14d12599ad8872e6167feb64807af5bac2f6a32cb75d",
+      "bytes": 766786
+    },
+    {
+      "name": "pku_training_words.utf8",
+      "url": "https://raw.githubusercontent.com/yuikns/icwb2-data/873a51fa6234c644126d2f2c5c603a97809d2e49/gold/pku_training_words.utf8",
+      "sha256": "68fdbcef065d315e5dc3dc4c0e1b68997b1849141ba93b8fa2325fb088b5b0f3",
+      "bytes": 490217
+    },
+    {
+      "name": "msr_training_words.utf8",
+      "url": "https://raw.githubusercontent.com/yuikns/icwb2-data/873a51fa6234c644126d2f2c5c603a97809d2e49/gold/msr_training_words.utf8",
+      "sha256": "d5328d5cc8576c8e008e70ad33882aae4ce2cbbbf6cd1130c59a66a248961b8c",
+      "bytes": 1065391
+    },
+    {
+      "name": "score",
+      "url": "https://raw.githubusercontent.com/yuikns/icwb2-data/873a51fa6234c644126d2f2c5c603a97809d2e49/scripts/score",
+      "sha256": "7b9410b0d5433e22067e4c75f5bd9fa7ba13e16357bca5fd050e4493f3e5189e",
+      "bytes": 7228
+    },
+    {
+      "name": "README.md",
+      "url": "https://raw.githubusercontent.com/yuikns/icwb2-data/873a51fa6234c644126d2f2c5c603a97809d2e49/README.md",
+      "sha256": "5bc6a8c0e573c9e2286bfc6aa728120d160bea00db3641a4fca47f9ac7adcaa9",
+      "bytes": 7924
+    }
+  ]
+}
