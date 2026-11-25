@@ -35,7 +35,7 @@ scws2 源自 [SCWS 1.x](https://github.com/hightman/scws) 的词典分词思路�
 
 ## 构建与运行
 
-需要 C11 编译器、Make、ar 和 Python 3.9+。Makefile 面向 macOS/Linux，Windows 构建尚未验证。Python 用于构建时生成规则表、词典加工及测试，运行时不需要。
+需要支持 C11 的 GCC/Clang、GNU Make、ar 和 Python 3.9+。当前已在 macOS 验证；Linux 及其他平台尚未完成验证，系统默认 make 不是 GNU Make 时需使用 `gmake`。Python 用于构建时生成规则表、词典加工及测试，运行时不需要。
 
 ```sh
 make -j2
@@ -49,11 +49,37 @@ build/scws2 -d build/dict/dictionary.xdb --search -i '中文分词测试'
 printf '南京市长江大桥\n' | build/scws2 -d build/dict/dictionary.xdb
 ```
 
-只有显式 `fetch` 联网，构建和测试不会自动下载词典。构建生成静态库、共享库、CLI 和词典编译器。`make install PREFIX=/path/to/prefix` 安装库、头文件和工具，不自动安装下载词典。
+只有显式 `fetch` 联网，构建和测试不会自动下载词典。构建生成静态库、共享库、CLI 和词典编译器。
 
 CLI 主要用于开发测试。`-d file` 根据扩展名选择格式：`.txt`（大小写不敏感）为 UTF-8 文本，其余为 XDB2。`--mmap` 为后续词典参数请求 mmap；不可用时退回内存。可重复 `-d` 叠加词典，后加载的同词定义优先。
 
 CLI 可不传 `-d`，此时仅使用内置规则和未知字符兜底。默认读取全部标准输入，以 TSV 输出字节跨度、字符跨度、词性、种类、来源和原词。`--search` 增加检索补词，`--bigrams` 可在搜索模式开启未知汉字二元兜底，`--symbols` 保留符号。
+
+## 安装与构建参数
+
+`make install` 默认安装到 `/usr/local`，`PREFIX` 不必填写。自定义目录可直接传 Make 变量，无需先设置环境变量：
+
+```sh
+make install PREFIX="$HOME/.local"
+
+# 打包暂存：写入 /tmp/scws2-package/usr/local/，不修改系统安装目录
+make install PREFIX=/usr/local DESTDIR=/tmp/scws2-package
+```
+
+安装内容为 `include/scws2.h`、`lib/libscws2.a`、`lib/libscws2.so`（macOS 为 `.dylib`），以及 `bin/scws2`、`bin/scws2-dict`。不安装词典、运行时规则或 PHP 扩展。词典路径由调用方传入；规则已编译进库，PHP 扩展尚未实现。
+
+| 变量 | 默认值 | 用途 |
+| --- | --- | --- |
+| `PREFIX` | `/usr/local` | 安装前缀，影响 include/lib/bin 位置 |
+| `DESTDIR` | 空 | 打包暂存根目录，实际位置为 `DESTDIR + PREFIX` |
+| `CC` / `AR` | `cc` / `ar` | C 编译器及静态库归档工具 |
+| `PYTHON` | `python3` | 构建及测试使用的 Python 解释器 |
+| `CFLAGS` | `-O2` | 编译选项；C11、警告和 PIC 选项由 Makefile 另外添加 |
+| `LDFLAGS` | 空 | 链接选项 |
+
+例如 `make CC=clang CFLAGS='-O0 -g'` 可生成调试构建。修改编译器或编译选项后先运行 `make clean`，Make 不会自动跟踪变量值变化。`make clean` 会删除整个 `build/`，包括已构建词典和本地评测输出；下载源保留在 `.cache/`，词典可重新构建。命令行变量优先于环境变量，且不会保存到后续 make 调用；需要连续使用时，应重复传入或显式导出环境变量。
+
+C 程序可使用 `cc -I"$HOME/.local/include" example.c "$HOME/.local/lib/libscws2.a" -o example` 链接本地安装的静态库。使用共享库时，需按目标系统配置运行时库搜索路径。
 
 ## 分词用例对照
 
