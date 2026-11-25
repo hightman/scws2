@@ -2,7 +2,7 @@
 
 面向社区、CMS 等通用全文检索的纯 C 词典分词工具包。仅支持 UTF-8；运行时无第三方依赖，不提供关键词提取和 IDF。C 接口见 [API.md](API.md)。
 
-scws2 源自 [SCWS 1.x](https://github.com/hightman/scws) 的词典分词思路，是独立维护的新项目，不是原项目的兼容升级。C API、PHP 扩展接口及 XDB2 词典格式均与 SCWS 1.x 不兼容，不能直接替换；库名为 `libscws2`，头文件为 `scws2.h`，C 符号使用 `scws2_` 前缀，未来 PHP 扩展命名为 `scws2`，以支持两代实现并存。
+scws2 源自 [SCWS 1.x](https://github.com/hightman/scws) 的词典分词思路，是独立维护的新项目，不是原项目的兼容升级。C API、PHP 扩展接口及 XDB2 词典格式均与 SCWS 1.x 不兼容，不能直接替换；库名为 `libscws2`，头文件为 `scws2.h`，C 符号使用 `scws2_` 前缀，PHP 扩展命名为 `scws2`，以支持两代实现并存。
 
 本仓库历史从新版词典流水线的首次提交开始，不包含 SCWS 1.x 提交历史；原项目代码、历史及旧 PHP 扩展请查阅上述来源仓库。原作者信息及许可证保留在 `AUTHORS` 和 `COPYING`。
 
@@ -29,7 +29,7 @@ scws2 源自 [SCWS 1.x](https://github.com/hightman/scws) 的词典分词思路�
 | --- | --- |
 | 词典 | 已提供来源锁定、人工修订、可复现 XDB2 构建、校验及词表差异报告；仍需补充新词来源和质量评估 |
 | 核心库与 CLI | 已实现上下文内部管理词典、严格 UTF-8、英文数字处理、候选 DAG、动态规划、standard/search 模式、叠加词典及可区分来源的补词；已有生命周期和独立上下文并发测试 |
-| PHP 扩展 | 尚未实现，待核心稳定后以对象接口薄封装 C 核心 |
+| PHP 扩展 | 已实现 PHP 7.0+ 的 Scws2 对象接口，segment 一次返回全部 token 数组；构建与实测范围见 [phpext/README.md](phpext/README.md) |
 
 当前是可运行原型，尚未通过真实检索质量和完整跨平台验收。搜索补词的歧义筛选仍需评估，算法替换不会自动解决旧词和新词不足问题。正式发布前须用分词及小型检索评估集衡量召回、误召回、词数、内存和速度；未验证的词典更新不自动发布。
 
@@ -68,7 +68,7 @@ make install PREFIX="$HOME/.local"
 make install PREFIX=/usr/local DESTDIR=/tmp/scws2-package
 ```
 
-安装内容为 `include/scws2.h`、`lib/libscws2.a`、`lib/libscws2.so`（macOS 为 `.dylib`），以及 `bin/scws2`、`bin/scws2-dict`。不安装词典、运行时规则或 PHP 扩展。词典路径由调用方传入；规则已编译进库，PHP 扩展尚未实现。
+安装内容为 `include/scws2.h`、`lib/libscws2.a`、`lib/libscws2.so`（macOS 为 `.dylib`），以及 `bin/scws2`、`bin/scws2-dict`。不安装词典、运行时规则或 PHP 扩展。词典路径由调用方传入；规则已编译进库；PHP 扩展从完整仓库单独通过 phpize 构建，无需先安装 libscws2，见 [扩展说明](phpext/README.md)。
 
 | 变量 | 默认值 | 用途 |
 | --- | --- | --- |
