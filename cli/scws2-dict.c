@@ -250,10 +250,12 @@ int main(int argc, char **argv)
 		/* fseek uses long; cap the prototype at 2 GiB for portability. */
 		if (file_size > INT32_MAX) fail("dictionary exceeds 2 GiB format limit");
 	}
+	file_size += 8; /* Fixed completion marker; included in the header size. */
+	if (file_size > INT32_MAX) fail("dictionary exceeds 2 GiB format limit");
 	output = fopen(argv[2], "wb");
 	if (!output) fail("cannot open output");
 	bytes("XDB2", 4);
-	u32(3); u32(HEADER_SIZE); u32(0); u32(BASE); u32(BUCKETS);
+	u32(4); u32(HEADER_SIZE); u32(0); u32(BASE); u32(BUCKETS);
 	u32((uint32_t) count); u32((uint32_t) file_size); u32(10);
 	bytes(reserved, sizeof(reserved));
 	for (uint32_t bucket = 0; bucket < BUCKETS; bucket++) {
@@ -267,6 +269,8 @@ int main(int argc, char **argv)
 		while (position < count && entries[position].bucket == bucket) position++;
 		tree(begin, position);
 	}
+	if (fseek(output, (long) file_size - 8, SEEK_SET)) fail("output seek failed");
+	bytes("XDB2END\n", 8);
 	if (fclose(output)) fail("output close failed");
 	for (size_t i = 0; i < count; i++) free(entries[i].key);
 	free(entries);

@@ -115,6 +115,9 @@ class DictionaryTests(unittest.TestCase):
         valid = self.compile('人工\t200\t3\tn\n人工智能\t600\t3\tnr\n').read_bytes()
         mutations = [valid[:20], valid[:-1], valid + b'junk']
         bad = bytearray(valid)
+        bad[-1] ^= 1
+        mutations.append(bytes(bad))
+        bad = bytearray(valid)
         bad[:4] = b'XDB\x22'
         mutations.append(bytes(bad))
         first_offset = 64 + 16381 * 8
@@ -294,7 +297,7 @@ class DictionaryTests(unittest.TestCase):
             bad = bytearray(valid)
             bad[index] = value
             mutations.append(bad)
-        for version in (1, 2):
+        for version in (1, 2, 3):
             bad = bytearray(valid)
             struct.pack_into('<I', bad, 4, version)
             mutations.append(bad)

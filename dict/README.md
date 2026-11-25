@@ -26,7 +26,7 @@ python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
 输出目录 `build/dict/` 包含：
 
 - `lexicon.tsv`：UTF-8 字节序排序的四列 `term / cost / flags / pos`，最后一列可为空。
-- `dictionary.xdb`：保留可选词性、不含 IDF 的 XDB2 schema 3 文件；旧 schema 1/2 产物需重建。
+- `dictionary.xdb`：保留可选词性、不含 IDF 的 XDB2 schema 4 文件，包含固定尾标记；旧 schema 1/2/3 产物需重建。
 - `manifest.json`：来源 commit、源文件 SHA-256、加工版本与代码指纹、编译器指纹、修订及结果校验和、统计。
 - `LICENSE.jieba`：随词典分发的上游 MIT 许可。引擎许可参见根目录 `COPYING`。
 

@@ -1,4 +1,4 @@
-# XDB2 dictionary format, version 3
+# XDB2 dictionary format, version 4
 
 All integers are unsigned little-endian values. No native C structures or floats
 are serialized. The extension remains `.xdb`; this is a new SCWS 2 format,
@@ -10,7 +10,7 @@ file-size check fail. Readers must check magic and schema before reading nodes.
 | Byte offset | Size | Meaning |
 | --- | --- | --- |
 | 0 | 4 | ASCII `XDB2` |
-| 4 | 4 | Schema version, 3 |
+| 4 | 4 | Schema version, 4 |
 | 8 | 4 | Header length, 64 |
 | 12 | 4 | Required features, 0 |
 | 16 | 4 | Hash base, `0x000f422f` |
@@ -73,7 +73,10 @@ Prefix-only nodes must have an empty POS. If a prefix is also a whole term,
 it retains that term's own tag; it never inherits the longer term's tag.
 
 Nodes are serialized in bucket/key order; tree links choose the midpoint of
-each sorted subrange. There are no gaps, timestamps or trailing bytes.
+each sorted subrange. There are no gaps or timestamps. The final node is
+followed by the fixed
+8-byte ASCII trailer `XDB2END\n` (hex `58 44 42 32 45 4e 44 0a`).
+The header file length includes this trailer; no bytes may follow it.
 Input order does not affect binary output. The compiler rejects duplicate
 whole terms; repeated generated prefixes are merged.
 
@@ -84,11 +87,19 @@ bounds, cycles/shared nodes, ordering, hash membership, flags, POS encoding and 
 nonoverlapping complete byte coverage, and the prefix closure. A SHA-256 of
 the entire file is recorded in the external build manifest, not inside XDB2.
 
-Future C loaders must perform structural validation before using offsets,
-and impose reasonable resource limits when loading untrusted files. Unknown
-schemas or required features must fail explicitly. This prototype schema
+Runtime loaders assume trusted compiler output. Opening checks only the
+header, exact file length, bucket-table extent, basic node-count bounds and
+fixed trailer; it does not scan nodes or allocate validation arrays. The
+trailer detects missing or overwritten endings, not arbitrary interior
+corruption. Lookup checks visited node bounds and limits traversal to 64
+steps to avoid out-of-range reads or loops from accidental link damage.
+Full consistency checks belong to the build pipeline or explicit `check`
+command. Unknown schemas or required features fail explicitly. This prototype
+schema
 may change before the first stable 2.0 release; bump the schema when it does.
 Schema 1 used an 8-byte POS-free value; schema 2 stored a variable-length
-POS label of up to 31 bytes. Both are rejected by current binary validation.
+POS label of up to 31 bytes. Schema 3 stored the same compact POS but had no
+trailer. All three are
+rejected by current binary validation.
 Rebuild old dictionaries from their locked source; the bundle diff command
-can still compare normalized lexicons from schemas 1, 2 and 3.
+can still compare normalized lexicons from schemas 1, 2, 3 and 4.

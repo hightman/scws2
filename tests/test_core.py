@@ -150,7 +150,7 @@ class CoreTests(unittest.TestCase):
         result = subprocess.run([str(self.api), str(self.dictionary)], capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr.decode())
 
-    def test_invalid_dictionary_header_links_and_pos_are_rejected(self):
+    def test_invalid_dictionary_framing_is_rejected(self):
         original = self.dictionary.read_bytes()
         mutations = [b'', original[:63], original[:-1], original + b'junk']
         for offset, value in [(4, 2), (8, 32), (12, 1), (16, 0), (20, 0), (20, 0xffffffff),
@@ -158,20 +158,45 @@ class CoreTests(unittest.TestCase):
             bad = bytearray(original)
             struct.pack_into('<I', bad, offset, value)
             mutations.append(bytes(bad))
-        first = 64 + 16381 * 8
-        for offset, value in [(first, first), (first + 8, 0xffffffff), (first + 16, 0),
-                              (first + 25 + original[first + 16], 255)]:
-            bad = bytearray(original)
-            if offset == first + 16 or offset >= first + 25:
-                bad[offset] = value
-            else:
-                struct.pack_into('<I', bad, offset, value)
-            mutations.append(bytes(bad))
+        bad = bytearray(original)
+        bad[-1] ^= 1
+        mutations.append(bytes(bad))
         for i, raw in enumerate(mutations):
             with self.subTest(i=i):
                 path = self.root / 'invalid.xdb'
                 path.write_bytes(raw)
                 self.invoke('中文', dictionary=path, success=False)
+
+    def test_open_does_not_scan_dictionary_records(self):
+        original = bytearray(self.dictionary.read_bytes())
+        first = 64 + 16381 * 8
+        # A record metadata error is for the offline checker, not open().
+        original[first + 25 + original[first + 16]] = 255
+        path = self.root / 'unchecked-record.xdb'
+        path.write_bytes(original)
+        self.assertEqual(self.invoke('abc', dictionary=path)[0]['word'], 'abc')
+
+    def test_damaged_lookup_links_are_bounded(self):
+        path = self.build('damaged-links', [('中文', 100, 3, 'n')])
+        original = path.read_bytes()
+        # Both 中 and 中文 hash to different buckets; damage the root for 中.
+        h = 0xf422f
+        for byte in reversed('中'.encode()):
+            h = ((h * 33) ^ byte) & 0x7fffffff
+        pointer = 64 + (h % 16381) * 8
+        root = struct.unpack_from('<I', original, pointer)[0]
+        for offset, value in ((pointer, len(original)), (root, root),
+                              (root + 8, root), (root + 16, 255)):
+            with self.subTest(offset=offset):
+                bad = bytearray(original)
+                if offset == root + 16:
+                    bad[offset] = value
+                else:
+                    struct.pack_into('<I', bad, offset, value)
+                if offset in (root, root + 8):
+                    bad[root + 17:root + 20] = ('串' if offset == root else '一').encode()
+                path.write_bytes(bad)
+                self.invoke('中国', dictionary=path)
 
     def test_seeded_binary_mutations_never_crash_or_hang(self):
         rng = random.Random(230024)

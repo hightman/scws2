@@ -186,7 +186,7 @@ def prepare(lock, cache, overrides, output):
             raise ValueError('cost exceeds uint32 range')
         lines.append(f'{term}\t{cost}\t{flags}\t{pos}\n')
     lexicon = ''.join(lines).encode()
-    manifest = {'pipeline_version': PIPELINE_VERSION, 'format': 'xdb2-v3',
+    manifest = {'pipeline_version': PIPELINE_VERSION, 'format': 'xdb2-v4',
                 'pos': {'tagset': 'jieba-compact-v1', 'source_tagset': 'jieba',
                         'mapping': JIEBA_POS_MAP, 'unknown': '',
                         'max_bytes': MAX_POS, 'used_in_scoring': False},
@@ -215,9 +215,10 @@ def check_xdb(path):
     if len(data) < HEADER.size:
         raise ValueError('truncated header')
     magic, version, size, features, base, buckets, count, file_size, value_size, reserved = HEADER.unpack_from(data)
-    if (magic != b'XDB2' or version != 3 or size != 64 or features != 0 or base != 0xf422f
+    if (magic != b'XDB2' or version != 4 or size != 64 or features != 0 or base != 0xf422f
             or value_size != VALUE.size or reserved != bytes(28) or file_size != len(data)
-            or not 1 <= buckets <= 1000000 or 64 + buckets * 8 > len(data)):
+            or not 1 <= buckets <= 1000000 or 64 + buckets * 8 > len(data) - 8
+            or data[-8:] != b'XDB2END\n'):
         raise ValueError('invalid XDB2 header')
     floor = 64 + buckets * 8
     seen, ranges, main_count, search_count, tagged_count = set(), [], 0, 0, 0
@@ -229,7 +230,7 @@ def check_xdb(path):
             (offset, length), lower, upper = stack.pop()
             if not offset and not length:
                 continue
-            if offset < floor or length < 28 or offset + length > len(data) or offset in seen:
+            if offset < floor or length < 28 or offset + length > len(data) - 8 or offset in seen:
                 raise ValueError('invalid, shared or cyclic node pointer')
             seen.add(offset)
             key_size = data[offset + 16]
@@ -261,7 +262,7 @@ def check_xdb(path):
         if start != end:
             raise ValueError('overlapping, missing or unreferenced record bytes')
         end = next_end
-    if end != len(data):
+    if end != len(data) - 8:
         raise ValueError('trailing bytes')
     expected_prefixes = set()
     for key, (_, flags) in records.items():
@@ -285,7 +286,7 @@ def read_bundle(directory):
     # Permit comparing an earlier POS-free bundle against a new one. Binary
     # readers still require the current schema and reject the old layout.
     version = manifest['format']
-    if version not in ('xdb2-v1', 'xdb2-v2', 'xdb2-v3'):
+    if version not in ('xdb2-v1', 'xdb2-v2', 'xdb2-v3', 'xdb2-v4'):
         raise ValueError('unsupported bundle format')
     for line in data.decode('utf-8').splitlines():
         parts = line.split('\t')
