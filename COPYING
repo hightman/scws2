@@ -1,8 +1,7 @@
-SCWS LICENSE
-============
-$Id$
+scws2 LICENSE
+=============
 
-SCWS 是一个免费开源的中文分词组件，在以下描述的 BSD 许可证的条款下发布。
+scws2 是一个免费开源的中文分词组件，在以下描述的 BSD 许可证的条款下发布。
 Copyright (C) 2007-2013，著作权由 hightman 所有，著作权人保留一切相关权利。
 
 Copyright (C) 2010-2013 by hightman
