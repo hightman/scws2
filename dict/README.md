@@ -6,7 +6,7 @@
 
 本目录集中维护词典流水线及其输入：`build.py` 提供下载、加工、构建、校验和差异报告；`sources.lock.json` 锁定来源，`overrides.tsv` 保存人工修订，`jieba.LICENSE` 保存数据许可，`FORMAT.md` 定义 XDB2 格式。
 
-通用纯 C 词典编译器位于 `cli/scws2-dict.c`。原始下载保存在 `.cache/dict/`，构建产物保存在 `build/dict/`；两者均不进入 Git，不混入本目录。
+通用纯 C 词典编译器位于 `tools/scws2-dict.c`。原始下载保存在 `.cache/dict/`，构建产物保存在 `build/dict/`；两者均不进入 Git，不混入本目录。
 
 ## 构建
 
@@ -14,7 +14,7 @@
 
 ```sh
 mkdir -p build
-cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror cli/scws2-dict.c -o build/scws2-dict
+cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror tools/scws2-dict.c -o build/scws2-dict
 python3 dict/build.py fetch
 python3 dict/build.py build
 python3 dict/build.py check build/dict/dictionary.xdb

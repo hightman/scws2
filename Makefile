@@ -36,10 +36,10 @@ build/libscws2.a: $(OBJECTS)
 $(SHARED): $(OBJECTS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(SHARED_FLAGS) $(OBJECTS) -o $@
 
-build/scws2: cli/scws2.c build/libscws2.a include/scws2.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) cli/scws2.c build/libscws2.a $(LDFLAGS) -o $@
+build/scws2: tools/scws2.c build/libscws2.a include/scws2.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) tools/scws2.c build/libscws2.a $(LDFLAGS) -o $@
 
-build/scws2-dict: cli/scws2-dict.c | build
+build/scws2-dict: tools/scws2-dict.c | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARNINGS) $< $(LDFLAGS) -o $@
 
 check test: all

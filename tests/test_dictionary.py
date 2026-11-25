@@ -24,7 +24,7 @@ class DictionaryTests(unittest.TestCase):
         command = shlex.split(os.environ.get('CC', 'cc'))
         flags = shlex.split(os.environ.get('DICT_TEST_CFLAGS', '-O2'))
         subprocess.run(command + ['-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + flags
-                       + [str(ROOT / 'cli/scws2-dict.c'), '-o', str(cls.compiler)], check=True)
+                       + [str(ROOT / 'tools/scws2-dict.c'), '-o', str(cls.compiler)], check=True)
 
     @classmethod
     def tearDownClass(cls):

@@ -34,11 +34,11 @@ class CoreTests(unittest.TestCase):
         flags = ['-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + shlex.split(os.environ.get('CORE_TEST_CFLAGS', '-O2'))
         source = [str(ROOT / name) for name in ('src/scws2.c', 'src/utf8.c', 'src/xdb.c', 'src/text.c', 'src/text_cache.c', 'src/rules.c')]
         includes = ['-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src'), '-I' + str(cls.root)]
-        for main, output, extra in [('cli/scws2.c', cls.cli, []), ('tests/core_api.c', cls.api, ['-pthread']), ('tests/text_dict.c', cls.text_compiler, [])]:
+        for main, output, extra in [('tools/scws2.c', cls.cli, []), ('tests/core_api.c', cls.api, ['-pthread']), ('tests/text_dict.c', cls.text_compiler, [])]:
             subprocess.run(cc + flags + includes + source + [str(ROOT / main), '-o', str(output)] + extra, check=True)
         subprocess.run(cc + flags + includes + ['-DSCWS2_NO_MMAP'] + source
                        + [str(ROOT / 'tests/core_api.c'), '-pthread', '-o', str(cls.no_mmap_api)], check=True)
-        subprocess.run(cc + flags + [str(ROOT / 'cli/scws2-dict.c'), '-o', str(cls.compiler)], check=True)
+        subprocess.run(cc + flags + [str(ROOT / 'tools/scws2-dict.c'), '-o', str(cls.compiler)], check=True)
         cls.dictionary = cls.build('base', [
             ('研究', 100, 3, 'v'), ('研究生', 50, 3, 'n'), ('生命', 100, 3, 'n'),
             ('命', 500, 3, 'n'), ('起源', 100, 3, 'n'), ('南京', 150, 3, 'ns'),

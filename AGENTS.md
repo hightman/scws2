@@ -6,7 +6,7 @@
 
 ## 项目结构与事实来源
 
-2.0 状态以根目录 `README.md` 为准，公共 API 契约见 `API.md`。`include/scws2.h` 为公共接口，`src/` 为核心与 XDB2 加载器，`cli/scws2.c` 为 CLI。`dict/README.md` 描述词典流水线，`dict/FORMAT.md` 定义 XDB2 字节契约，`dict/sources.lock.json` 锁定上游。`dict/build.py` 负责获取和加工，`cli/scws2-dict.c` 为纯 C 编译器；`tests/` 包含离线词典/核心集成测试及原生 C API 测试。
+2.0 状态以根目录 `README.md` 为准，公共 API 契约见 `API.md`。`include/scws2.h` 为公共接口，`src/` 为核心与 XDB2 加载器，`tools/scws2.c` 为 CLI。`dict/README.md` 描述词典流水线，`dict/FORMAT.md` 定义 XDB2 字节契约，`dict/sources.lock.json` 锁定上游。`dict/build.py` 负责获取和加工，`tools/scws2-dict.c` 为纯 C 编译器；`tests/` 包含离线词典/核心集成测试及原生 C API 测试。
 
 旧引擎、字符集层、Autotools 构建及历史演示已移除；SCWS 1.x 实现和历史保留在来源仓库 https://github.com/hightman/scws；本仓库历史从新版开发开始。`phpext/` 等待核心稳定后重写。`src/rules.ini` 为简繁共用的 UTF-8 规则源，仅维护符号、数字及单位，契约见 `src/RULES.md`。不要修改原 SCWS 仓库或清理用户原有文件。
 
