@@ -41,4 +41,4 @@ C11 使用 Tab 缩进和 `snake_case`；Python 使用四空格和标准库。没
 
 `scws2_segment()` 返回独立拥有 token 和游标的 `scws2_result_t`，NULL 表示错误，空输入成功返回零 token 结果。调用者使用 `scws2_result_free()` 释放，结果不依赖 ctx 或词典生命周期。错误保存在 ctx 中，`scws2_error_code(ctx)` / `scws2_strerror(ctx)` 只查询；上下文操作成功清错，不使用全局错误变量。
 
-运行时文本词典由 `src/text.c` 编译、`src/text_cache.c` 缓存；缓存版本随解析、评分、标签映射或格式变化递增。词典参数为位标志，仅 TEXT / MMAP，0 表示 XDB 内存加载；不猜测格式或记忆模式，mmap 不可用时退回内存。缓存修改需验证并发锁、原子发布、跨进程复用、失效重建及各标志组合。词性说明维护在 `dict/POS.md`。
+运行时文本词典由 `src/text.c` 编译、`src/text_cache.c` 缓存；缓存版本随解析、评分、标签映射或格式变化递增。词典参数为位标志，仅 TEXT / MEMORY，0 表示 XDB 默认请求 mmap，MEMORY 强制 fread 内存加载；不猜测格式或记忆模式，mmap 不可用时退回内存。缓存修改需验证并发锁、原子发布、跨进程复用、失效重建及各标志组合。词性说明维护在 `dict/POS.md`。

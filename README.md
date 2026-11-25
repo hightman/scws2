@@ -53,7 +53,7 @@ printf '南京市长江大桥\n' | build/scws2 -d build/dict/dictionary.xdb
 
 辅助程序统一放在 `tools/`：`scws2.c` 用于分词测试，`scws2-dict.c` 用于编译词典，与评测及规则生成工具共同维护。
 
-CLI 主要用于开发测试。`-d file` 根据扩展名选择格式：`.txt`（大小写不敏感）为 UTF-8 文本，其余为 XDB2。`--mmap` 为后续词典参数请求 mmap；不可用时退回内存。可重复 `-d` 叠加词典，后加载的同词定义优先。
+CLI 主要用于开发测试，调用层显式使用 `SCWS2_DICT_MEMORY`，默认整库读入内存。`-d file` 根据扩展名选择格式：`.txt`（大小写不敏感）为 UTF-8 文本，其余为 XDB2。`--mmap` 为后续词典参数请求 mmap；不可用时退回内存。可重复 `-d` 叠加词典，后加载的同词定义优先。
 
 CLI 可不传 `-d`，此时仅使用内置规则和未知字符兜底。默认读取全部标准输入，以 TSV 输出字节跨度、字符跨度、词性、种类、来源和原词。`--search` 增加检索补词，`--bigrams` 可在搜索模式开启未知汉字二元兜底，`--symbols` 保留符号。
 
@@ -81,6 +81,8 @@ make install PREFIX=/usr/local DESTDIR=/tmp/scws2-package
 
 例如 `make CC=clang CFLAGS='-O0 -g'` 可生成调试构建。修改编译器或编译选项后先运行 `make clean`，Make 不会自动跟踪变量值变化。`make clean` 会删除整个 `build/`，包括已构建词典和本地评测输出；下载源保留在 `.cache/`，词典可重新构建。命令行变量优先于环境变量，且不会保存到后续 make 调用；需要连续使用时，应重复传入或显式导出环境变量。
 
+当前不使用 configure 探测 mmap；`src/xdb.c` 在 Unix/macOS 平台宏存在且未定义 `SCWS2_NO_MMAP` 时编译 mmap 路径，其余平台使用内存加载。可运行 `make -B CFLAGS='-O2 -DSCWS2_NO_MMAP'` 强制重建为禁用 mmap 的版本，无需删除已有词典；编译选项须在后续构建中保持一致。运行时映射失败也自动回退 fread。
+
 C 程序可使用 `cc -I"$HOME/.local/include" example.c "$HOME/.local/lib/libscws2.a" -o example` 链接本地安装的静态库。使用共享库时，需按目标系统配置运行时库搜索路径。
 
 ## 分词用例对照
@@ -96,9 +98,9 @@ python3 tools/check_segments.py --case case-07-standard --case case-07-search
 
 ## 词典
 
-词典默认整库加载到内存；C API 先用 `scws2_t ctx = scws2_new()` 创建上下文，再用 `scws2_set_dict(ctx, path, 0)` 加载词典，或传 `SCWS2_DICT_MMAP` 选择只读映射；`scws2_free(ctx)` 统一释放词典和上下文。`scws2_segment()` 返回独立的 `scws2_result_t`，用 `scws2_result_next()` 遍历、`scws2_result_free()` 释放，可嵌套分词；结果在 ctx 释放后仍有效。契约见 [API.md](API.md)。mmap 不可用时退回内存。
+核心词典默认请求只读 mmap；C API 先用 `scws2_t ctx = scws2_new()` 创建上下文，再用 `scws2_set_dict(ctx, path, 0)` 加载词典，或传 `SCWS2_DICT_MEMORY` 强制整库 fread 到私有内存；`scws2_free(ctx)` 统一释放词典和上下文。`scws2_segment()` 返回独立的 `scws2_result_t`，用 `scws2_result_next()` 遍历、`scws2_result_free()` 释放，可嵌套分词；结果在 ctx 释放后仍有效。契约见 [API.md](API.md)。mmap 不可用时退回内存。
 
-运行时可用 `scws2_add_dict(ctx, "user.txt", SCWS2_DICT_TEXT)` 加载 UTF-8 自定义词表。一行一个词，支持空格/Tab 分隔的 `词条 词频 词性` 或 `词条 词性 词频`；缺省词性为 `un`，缺省及 `0` 词频按最低值 `1` 处理。文本自动编译并缓存为临时 XDB，后续加载跨进程复用；默认以内存方式加载，按位组合 `SCWS2_DICT_TEXT | SCWS2_DICT_MMAP` 可请求 mmap，不记忆前次加载方式。格式、词频参考及缓存说明见 [API.md](API.md#文本词典)，词性说明见 [dict/POS.md](dict/POS.md)。
+运行时可用 `scws2_add_dict(ctx, "user.txt", SCWS2_DICT_TEXT)` 加载 UTF-8 自定义词表。一行一个词，支持空格/Tab 分隔的 `词条 词频 词性` 或 `词条 词性 词频`；缺省词性为 `un`，缺省及 `0` 词频按最低值 `1` 处理。文本自动编译并缓存为临时 XDB，后续加载跨进程复用；默认请求 mmap，按位组合 `SCWS2_DICT_TEXT | SCWS2_DICT_MEMORY` 可强制内存加载，不记忆前次加载方式。格式、词频参考及缓存说明见 [API.md](API.md#文本词典)，词性说明见 [dict/POS.md](dict/POS.md)。
 
 当前唯一接入的上游是 jieba 标准词典，THUOCL 尚未融入。词性最多两个 ASCII 字符，`nrt`、`nrfg` 在加工时归并为 `nr`，缺失时为空；词性不参与切分评分。
 

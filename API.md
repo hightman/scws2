@@ -67,14 +67,16 @@ int main(void)
 
 | flags | 输入格式 | 加载方式 |
 | --- | --- | --- |
-| `0` | XDB2 | 整库 `fread` 到私有缓冲区 |
-| `SCWS2_DICT_MMAP` | XDB2 | 请求只读 mmap |
-| `SCWS2_DICT_TEXT` | UTF-8 文本 | 编译/复用临时 XDB2，以内存方式加载 |
-| `SCWS2_DICT_TEXT \| SCWS2_DICT_MMAP` | UTF-8 文本 | 编译/复用临时 XDB2，请求只读 mmap |
+| `0` | XDB2 | 默认请求只读 mmap |
+| `SCWS2_DICT_MEMORY` | XDB2 | 强制整库 `fread` 到私有缓冲区 |
+| `SCWS2_DICT_TEXT` | UTF-8 文本 | 编译/复用临时 XDB2，默认请求只读 mmap |
+| `SCWS2_DICT_TEXT \| SCWS2_DICT_MEMORY` | UTF-8 文本 | 编译/复用临时 XDB2，强制内存加载 |
 
-`SCWS2_DICT_MMAP = 1u << 0`，`SCWS2_DICT_TEXT = 1u << 1`，两者可按位或；没有 MEMORY 或 AUTO 标志。只对未知位等无效参数返回 `SCWS2_EINVAL`，四种合法组合均接受。不根据扩展名或文件内容自动猜测格式，指定错误格式会加载失败。
+`SCWS2_DICT_MEMORY = 1u << 0`，`SCWS2_DICT_TEXT = 1u << 1`，两者可按位或；没有 MMAP 或 AUTO 标志。只对未知位等无效参数返回 `SCWS2_EINVAL`，四种合法组合均接受。不根据扩展名或文件内容自动猜测格式，指定错误格式会加载失败。
 
-mmap 使用 `PROT_READ`、`MAP_SHARED`，多进程可共享文件页缓存。平台不支持、构建指定 `-DSCWS2_NO_MMAP` 或映射失败时自动改用内存。内存加载后不依赖原文件；mmap 映射仍引用文件。没有按尺寸判断或 ctx 模式记忆。
+加载策略已变更：旧 `SCWS2_DICT_MMAP` 移除，旧代码中表示内存加载的 `0` 需改为 `SCWS2_DICT_MEMORY`，原 mmap 调用改为 `0`。旧标志的数值 `1` 现在表示强制内存加载，调用方必须同步源码并重新编译。
+
+mmap 使用 `PROT_READ`、`MAP_SHARED`，多进程可共享文件页缓存。`SCWS2_DICT_MEMORY` 跳过 mmap，直接 fread；其余情况下平台不支持、构建指定 `-DSCWS2_NO_MMAP` 或映射失败时自动改用内存。内存加载后不依赖原文件；mmap 映射仍引用文件。没有按尺寸判断或 ctx 模式记忆。
 
 二进制均为 XDB2 schema 4，最多接受 512 MiB；打开时只检查头部、尺寸、桶表范围、节点数量基本范围及尾标记，不遍历词条。完整检查由构建流水线执行。查询保留节点范围及遍历步数保护，不保证发现所有中间数据损坏。
 
@@ -130,15 +132,15 @@ macOS/Linux 默认在 `$TMPDIR/scws2-text-<uid>/`（TMPDIR 未设时为 `/tmp/sc
 
 缓存命中只做现有的 XDB2 轻量校验；损坏或失效则重新编译。未命中时对 `.lock` 文件加排他锁，取得锁后再检查，完整写入同目录唯一临时文件并关闭后 `rename` 发布。不会原地截断正在 mmap 的 XDB；进程退出时锁自动释放。目录权限 0700，缓存及锁文件 0600。编译期间源文件变化则失败，不发布该次结果。
 
-每次调用独立决定加载方式，TEXT 不继承之前的选择：
+每次调用独立决定加载方式，TEXT 不继承之前的选择，默认同样请求 mmap：
 
 ```c
-scws2_set_dict(ctx, "dictionary.xdb", SCWS2_DICT_MMAP);
-scws2_add_dict(ctx, "small.txt", SCWS2_DICT_TEXT); /* 内存 */
-scws2_add_dict(ctx, "large.txt", SCWS2_DICT_TEXT | SCWS2_DICT_MMAP); /* 请求 mmap */
+scws2_set_dict(ctx, "dictionary.xdb", 0); /* 默认 mmap */
+scws2_add_dict(ctx, "small.txt", SCWS2_DICT_TEXT | SCWS2_DICT_MEMORY); /* 强制内存 */
+scws2_add_dict(ctx, "large.txt", SCWS2_DICT_TEXT); /* 默认 mmap */
 ```
 
-缓存不可用时直接编译并使用内存，即使传入了 MMAP 也不因此失败。不支持 POSIX 缓存的平台或编译时指定 `-DSCWS2_NO_TEXT_CACHE` 时也如此。首次编译有解析、排序和前缀构建的临时内存开销，后续加载可跨 ctx、跨进程复用缓存。
+缓存不可用时直接编译并使用内存，即使默认请求 mmap 也不因此失败。不支持 POSIX 缓存的平台或编译时指定 `-DSCWS2_NO_TEXT_CACHE` 时也如此。首次编译有解析、排序和前缀构建的临时内存开销，后续加载可跨 ctx、跨进程复用缓存。
 
 源文件变化或缓存版本升级会生成新文件，不自动清理旧缓存及锁文件。可在没有加载任务时清理专用缓存目录，已有 mmap 上下文仍引用旧文件；下次加载自动重建。系统清理临时目录也不会删除源词表。大型基础词典仍建议通过正式流水线预编译并保留来源、许可与构建清单。
 

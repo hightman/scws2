@@ -15,7 +15,7 @@ typedef enum {
 	SCWS2_EUTF8, SCWS2_ELIMIT, SCWS2_ENOTSUP
 } scws2_status_t;
 typedef unsigned scws2_dict_flags_t;
-enum { SCWS2_DICT_MMAP = 1u << 0, SCWS2_DICT_TEXT = 1u << 1 };
+enum { SCWS2_DICT_MEMORY = 1u << 0, SCWS2_DICT_TEXT = 1u << 1 };
 typedef enum { SCWS2_STANDARD = 0, SCWS2_SEARCH = 1 } scws2_mode_t;
 typedef enum { SCWS2_PRIMARY = 0, SCWS2_SECONDARY = 1, SCWS2_FALLBACK = 2 } scws2_kind_t;
 typedef enum { SCWS2_DICTIONARY = 0, SCWS2_BUILTIN = 1, SCWS2_UNKNOWN = 2 } scws2_origin_t;
@@ -34,9 +34,9 @@ scws2_t scws2_new(void);
 /* Frees the context and its dictionaries, not returned results; NULL is accepted. */
 void scws2_free(scws2_t ctx);
 /* Replace all dictionaries, or append an overlay. The context owns all loaded
- * data. Failure preserves existing dictionaries. Flags: 0 reads XDB into memory;
- * TEXT compiles/caches UTF-8 rows; MMAP requests a read-only mapping of the XDB.
- * TEXT | MMAP combines both. If mapping is unavailable, use memory instead. */
+ * data. Failure preserves existing dictionaries. Flags: 0 requests a read-only
+ * mapping of the XDB; MEMORY forces fread; TEXT compiles/caches UTF-8 rows.
+ * TEXT | MEMORY combines both. If mapping is unavailable, use memory instead. */
 scws2_status_t scws2_set_dict(scws2_t ctx, const char *path, scws2_dict_flags_t flags);
 scws2_status_t scws2_add_dict(scws2_t ctx, const char *path, scws2_dict_flags_t flags);
 /* Replaces all flags; defaults to 0. Does not change scoring parameters. */

@@ -23,6 +23,7 @@ class TextCacheTests(unittest.TestCase):
         includes = ['-I' + str(ROOT / p) for p in ('include', 'src')] + ['-I' + str(cls.bin)]
         sources = [str(ROOT / p) for p in ('src/text.c', 'src/text_cache.c', 'src/utf8.c', 'src/rules.c', 'tests/cache_api.c')]
         for name, definitions in [('normal', []), ('no-mmap', ['-DSCWS2_NO_MMAP']),
+                                  ('mmap-failure', ['-DSCWS2_TEST_MMAP_FAILURE']),
                                   ('no-cache', ['-DSCWS2_NO_TEXT_CACHE'])]:
             subprocess.run(cc + flags + definitions + includes + sources + ['-o', str(cls.bin / name)], check=True)
         cls.large = cls.bin / 'large.txt'
@@ -52,7 +53,7 @@ class TextCacheTests(unittest.TestCase):
         return list(self.root.glob('scws2-text-*/*.xdb'))
 
     def test_reuses_cache_across_processes_and_normalizes_path(self):
-        self.assertEqual(self.load(), [0])
+        self.assertEqual(self.load(), [1])
         cache, = self.cached()
         previous = cache.stat()
         alias = self.root / 'alias.txt'
@@ -101,21 +102,21 @@ class TextCacheTests(unittest.TestCase):
                     fcntl.flock(locked, fcntl.LOCK_UN)
                     stdout, stderr = process.communicate(timeout=15)
                 self.assertEqual(process.returncode, 0, stderr.decode())
-                self.assertEqual(stdout, b'0\n')
+                self.assertEqual(stdout, b'1\n')
         cache.unlink()
         with ThreadPoolExecutor(max_workers=8) as pool:
             results = list(pool.map(lambda _: self.load(), range(8)))
-        self.assertEqual(results, [[0]] * 8)
+        self.assertEqual(results, [[1]] * 8)
         self.assertEqual(len(self.cached()), 1)
         self.assertEqual(list(cache.parent.glob('*.tmp-*')), [])
         self.assertTrue(cache.read_bytes().endswith(b'XDB2END\n'))
 
     def test_explicit_flags_ignore_size_and_previous_calls(self):
-        self.assertEqual(self.load(source=self.large, extra=(self.source,)), [0, 0])
-        self.assertEqual(self.load(source=self.large, flags=3, extra=(self.source,)), [1, 1])
+        self.assertEqual(self.load(source=self.large, extra=(self.source,)), [1, 1])
+        self.assertEqual(self.load(source=self.large, flags=3, extra=(self.source,)), [0, 0])
         large_cache, = [p for p in self.cached() if p.stat().st_size >= 1024 * 1024]
-        self.assertEqual(self.load(source=self.large, base=large_cache, base_flags=1), [0])
-        self.assertEqual(self.load(base=large_cache, flags=3), [1])
+        self.assertEqual(self.load(source=self.large, base=large_cache, base_flags=1), [1])
+        self.assertEqual(self.load(base=large_cache, flags=3), [0])
         self.assertEqual(self.load(source=self.large, flags=3, binary='no-mmap'), [0])
         self.assertEqual(self.load(source=large_cache, flags=1, binary='no-mmap'), [0])
 
@@ -127,22 +128,36 @@ class TextCacheTests(unittest.TestCase):
         self.assertEqual(self.load(binary='no-cache'), [0])
         self.assertEqual(self.cached(), [])
 
+    def test_default_mmap_and_explicit_memory_for_both_formats(self):
+        self.assertEqual(self.load(flags=2), [1])
+        cache, = self.cached()
+        previous = cache.stat()
+        self.assertEqual(self.load(flags=3), [0])
+        self.assertEqual((cache.stat().st_ino, cache.stat().st_mtime_ns),
+                         (previous.st_ino, previous.st_mtime_ns))
+        self.assertEqual(self.load(source=cache, flags=0), [1])
+        self.assertEqual(self.load(source=cache, flags=1), [0])
+        for binary in ('no-mmap', 'mmap-failure'):
+            for source, flags in ((cache, 0), (cache, 1), (self.source, 2), (self.source, 3)):
+                with self.subTest(binary=binary, flags=flags):
+                    self.assertEqual(self.load(source=source, flags=flags, binary=binary), [0])
+
     def test_mmap_request_uses_memory_when_cache_is_unavailable(self):
         self.load()
         base, = self.cached()
         self.environment['TMPDIR'] = str(self.root / 'unavailable' / 'directory')
         for binary in ('normal', 'no-cache', 'no-mmap'):
-            self.assertEqual(self.load(base=base, base_flags=1, flags=3, binary=binary), [0])
+            self.assertEqual(self.load(base=base, base_flags=1, flags=2, binary=binary), [0])
 
     def test_library_format_flags_ignore_extensions(self):
         self.load()
         cache, = self.cached()
         misleading = self.root / 'binary.txt'
         misleading.write_bytes(cache.read_bytes())
-        self.assertEqual(self.load(source=misleading, flags=0), [0])
+        self.assertEqual(self.load(source=misleading, flags=0), [1])
         text = self.root / 'words.data'
         text.write_bytes(self.source.read_bytes())
-        self.assertEqual(self.load(source=text, flags=2), [0])
+        self.assertEqual(self.load(source=text, flags=2), [1])
         for source, flags in ((text, 0), (misleading, 2)):
             result = subprocess.run(self.command(source=source, flags=flags), env=self.environment,
                                     capture_output=True, timeout=15)

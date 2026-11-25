@@ -114,7 +114,7 @@ scws2_status_t scws2_text_open(const char *path, scws2_dict_flags_t flags, scws2
 	unsigned char *data = NULL;
 	uint32_t size = 0;
 	scws2_status_t status;
-	if (!path || !out || (flags & ~SCWS2_DICT_MMAP))
+	if (!path || !out || (flags & ~SCWS2_DICT_MEMORY))
 		return SCWS2_EINVAL;
 	*out = NULL;
 #if !defined(SCWS2_NO_TEXT_CACHE) && (defined(__unix__) || defined(__APPLE__))

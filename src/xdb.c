@@ -14,7 +14,7 @@
 #define HEADER 64u
 #define TRAILER 8u
 #define MAX_DICTIONARY_BYTES (512u * 1024u * 1024u)
-struct scws2_dict { unsigned char *data; uint32_t size, buckets, base; scws2_dict_flags_t flags; };
+struct scws2_dict { unsigned char *data; uint32_t size, buckets, base; int mapped; };
 
 static uint32_t u32(const unsigned char *p)
 {
@@ -88,7 +88,7 @@ scws2_status_t scws2_dict_from_data(unsigned char *data, uint32_t size, scws2_di
 	scws2_dict_t *dict = calloc(1, sizeof(*dict));
 	scws2_status_t status;
 	if (!dict) { free(data); return SCWS2_ENOMEM; }
-	dict->data = data; dict->size = size; dict->flags = 0;
+	dict->data = data; dict->size = size;
 	status = validate(dict);
 	if (status) { scws2_dict_close(dict); return status; }
 	*out = dict;
@@ -103,11 +103,8 @@ scws2_status_t scws2_dict_open_ex(const char *path, scws2_dict_flags_t flags, sc
 	scws2_status_t status;
 	if (!out) return SCWS2_EINVAL;
 	*out = NULL;
-	if (!path || flags & ~(SCWS2_DICT_TEXT | SCWS2_DICT_MMAP)) return SCWS2_EINVAL;
-	if (flags & SCWS2_DICT_TEXT) return scws2_text_open(path, flags & SCWS2_DICT_MMAP, out);
-#ifndef SCWS2_HAVE_MMAP
-	flags = 0;
-#endif
+	if (!path || flags & ~(SCWS2_DICT_TEXT | SCWS2_DICT_MEMORY)) return SCWS2_EINVAL;
+	if (flags & SCWS2_DICT_TEXT) return scws2_text_open(path, flags & SCWS2_DICT_MEMORY, out);
 	fp = fopen(path, "rb");
 	if (!fp) return SCWS2_EIO;
 	if (fseek(fp, 0, SEEK_END) || (length = ftell(fp)) < 0 || fseek(fp, 0, SEEK_SET)) {
@@ -119,16 +116,14 @@ scws2_status_t scws2_dict_open_ex(const char *path, scws2_dict_flags_t flags, sc
 	dict = calloc(1, sizeof(*dict));
 	if (!dict) { fclose(fp); return SCWS2_ENOMEM; }
 	dict->size = (uint32_t) length;
-	dict->flags = flags;
 #ifdef SCWS2_HAVE_MMAP
-	if (flags == SCWS2_DICT_MMAP) {
+	if (!(flags & SCWS2_DICT_MEMORY)) {
 		void *mapping = mmap(NULL, dict->size, PROT_READ, MAP_SHARED, fileno(fp), 0);
-		if (mapping == MAP_FAILED) dict->flags = 0;
-		else dict->data = mapping;
+		if (mapping != MAP_FAILED) { dict->data = mapping; dict->mapped = 1; }
 	}
 #endif
 	status = SCWS2_OK;
-	if (dict->flags != SCWS2_DICT_MMAP) {
+	if (!dict->mapped) {
 		dict->data = malloc(dict->size);
 		if (!dict->data) { fclose(fp); free(dict); return SCWS2_ENOMEM; }
 		status = fread(dict->data, 1, dict->size, fp) == dict->size ? SCWS2_OK : SCWS2_EIO;
@@ -143,7 +138,7 @@ void scws2_dict_close(scws2_dict_t *dict)
 {
 	if (!dict) return;
 #ifdef SCWS2_HAVE_MMAP
-	if (dict->flags == SCWS2_DICT_MMAP) munmap(dict->data, dict->size);
+	if (dict->mapped) munmap(dict->data, dict->size);
 	else
 #endif
 		free(dict->data);

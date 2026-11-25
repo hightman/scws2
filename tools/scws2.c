@@ -24,7 +24,7 @@ int main(int argc, char **argv)
 	scws2_result_t tokens = NULL;
 	size_t length = 0;
 	unsigned flags = 0;
-	scws2_dict_flags_t dict_flags = 0;
+	scws2_dict_flags_t dict_flags = SCWS2_DICT_MEMORY;
 	scws2_mode_t mode = SCWS2_STANDARD;
 	const char *input = NULL;
 	char *owned = NULL;
@@ -34,7 +34,7 @@ int main(int argc, char **argv)
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) { usage(stdout); result = EXIT_SUCCESS; goto done; }
 		if (!strcmp(argv[i], "--version")) { puts(SCWS2_VERSION); result = EXIT_SUCCESS; goto done; }
-		if (!strcmp(argv[i], "--mmap")) dict_flags |= SCWS2_DICT_MMAP;
+		if (!strcmp(argv[i], "--mmap")) dict_flags = 0;
 		else if (!strcmp(argv[i], "--search")) mode = SCWS2_SEARCH;
 		else if (!strcmp(argv[i], "--bigrams")) flags |= SCWS2_FALLBACK_BIGRAM;
 		else if (!strcmp(argv[i], "--symbols")) flags |= SCWS2_KEEP_SYMBOLS;

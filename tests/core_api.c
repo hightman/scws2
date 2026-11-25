@@ -197,10 +197,10 @@ static int compare_modes(const char *path, const char *overlay)
 	const char *texts[] = {"研究生命起源南京市长江大桥", "中文 C++ ２０２６年三点五公斤", "𠀀词未知词人工智能"};
 	CHECK(a && b);
 	CHECK(scws2_set_dict(a, path, 0) == SCWS2_OK);
-	CHECK(scws2_set_dict(b, path, SCWS2_DICT_MMAP) == SCWS2_OK);
+	CHECK(scws2_set_dict(b, path, SCWS2_DICT_MEMORY) == SCWS2_OK);
 	for (int layer = 0; layer < 2; layer++) {
 		if (layer) {
-			CHECK(scws2_add_dict(a, overlay, SCWS2_DICT_MMAP) == SCWS2_OK);
+			CHECK(scws2_add_dict(a, overlay, SCWS2_DICT_MEMORY) == SCWS2_OK);
 			CHECK(scws2_add_dict(b, overlay, 0) == SCWS2_OK);
 		}
 		for (size_t i = 0; i < sizeof(texts) / sizeof(texts[0]); i++) {
@@ -229,9 +229,9 @@ static int replace_file(const char *path, const char *replacement)
 	scws2_t contexts[3] = {scws2_new(), scws2_new(), scws2_new()};
 	CHECK(contexts[0] && contexts[1] && contexts[2]);
 	CHECK(scws2_set_dict(contexts[0], path, 0) == SCWS2_OK);
-	CHECK(scws2_set_dict(contexts[1], path, SCWS2_DICT_MMAP) == SCWS2_OK);
+	CHECK(scws2_set_dict(contexts[1], path, SCWS2_DICT_MEMORY) == SCWS2_OK);
 	CHECK(rename(replacement, path) == 0);
-	CHECK(scws2_set_dict(contexts[2], path, SCWS2_DICT_MMAP) == SCWS2_OK);
+	CHECK(scws2_set_dict(contexts[2], path, SCWS2_DICT_MEMORY) == SCWS2_OK);
 	for (int i = 0; i < 3; i++) {
 		CHECK(expect_result(contexts[i], "中文", 6, SCWS2_STANDARD, i == 2 ? 2u : 1u, 0) == 0);
 		scws2_free(contexts[i]);
@@ -258,7 +258,7 @@ int main(int argc, char **argv)
 #endif
 	/* Used by Python to check malformed files in either loading mode. */
 	if (argc == 4) {
-		scws2_dict_flags_t mode = !strcmp(argv[2], "mmap") ? SCWS2_DICT_MMAP : 0;
+		scws2_dict_flags_t mode = !strcmp(argv[2], "mmap") ? 0 : SCWS2_DICT_MEMORY;
 		scws2_status_t expected = !strcmp(argv[3], "format") ? SCWS2_EFORMAT : SCWS2_EIO;
 		CHECK(scws2_set_dict(ctx, argv[1], mode) == expected && scws2_error_code(ctx) == expected);
 		scws2_free(ctx); return 0;
@@ -267,9 +267,9 @@ int main(int argc, char **argv)
 	CHECK(exercise(argv[1], 0) == 0);
 	CHECK(ownership(argv[1], argv[2], 0) == 0);
 	CHECK(nested_results(argv[1], argv[2], 0) == 0);
-	CHECK(exercise(argv[1], SCWS2_DICT_MMAP) == 0);
-	CHECK(ownership(argv[1], argv[2], SCWS2_DICT_MMAP) == 0);
-	CHECK(nested_results(argv[1], argv[2], SCWS2_DICT_MMAP) == 0);
+	CHECK(exercise(argv[1], SCWS2_DICT_MEMORY) == 0);
+	CHECK(ownership(argv[1], argv[2], SCWS2_DICT_MEMORY) == 0);
+	CHECK(nested_results(argv[1], argv[2], SCWS2_DICT_MEMORY) == 0);
 	CHECK(compare_modes(argv[1], argv[2]) == 0);
 	scws2_free(ctx);
 	return 0;

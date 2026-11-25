@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 	fclose(fp); free(buffer);
 	ctx = scws2_new();
 	if (!ctx) fail("out of memory");
-	if (scws2_set_dict(ctx, argv[1], !strcmp(argv[4], "memory") ? 0 : SCWS2_DICT_MMAP)
+	if (scws2_set_dict(ctx, argv[1], !strcmp(argv[4], "memory") ? SCWS2_DICT_MEMORY : 0)
 		|| scws2_set_options(ctx, SCWS2_KEEP_SYMBOLS)) fail("cannot configure dictionary");
 	/* One warm-up; corpus/dictionary loading and output formatting excluded. */
 	if (iterations > 0) for (size_t i = 0; i < count; i++) segment(ctx, &lines[i], 0);
