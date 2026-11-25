@@ -5,7 +5,7 @@
 #include <string.h>
 
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "API check failed at line %d: %s\n", __LINE__, #x); return 1; } } while (0)
-typedef struct { const char *filename; scws_dict_mode_t mode; int failed; } task;
+typedef struct { const char *filename; scws_dict_flags_t mode; int failed; } task;
 static void *worker(void *argument)
 {
 	task *job = argument;
@@ -35,7 +35,7 @@ static int expect_result(scws_t ctx, const char *text, size_t length, scws_mode_
 	scws_result_free(result);
 	return failed;
 }
-static int exercise(const char *path, scws_dict_mode_t mode)
+static int exercise(const char *path, scws_dict_flags_t mode)
 {
 	scws_t ctx = scws_new(), second = scws_new();
 	scws_result_t a, b, empty;
@@ -56,8 +56,8 @@ static int exercise(const char *path, scws_dict_mode_t mode)
 	CHECK(scws_set_unknown_cost(NULL, 100) == SCWS_EINVAL);
 	CHECK(scws_set_unknown_cost(ctx, 18432) == SCWS_OK);
 	CHECK(scws_add_dict(ctx, NULL, mode) == SCWS_EINVAL);
-	CHECK(scws_set_dict(ctx, path, (scws_dict_mode_t) 99) == SCWS_EINVAL);
-	CHECK(scws_add_dict(ctx, path, (scws_dict_mode_t) 99) == SCWS_EINVAL);
+	CHECK(scws_set_dict(ctx, path, (scws_dict_flags_t) 99) == SCWS_EINVAL);
+	CHECK(scws_add_dict(ctx, path, (scws_dict_flags_t) 99) == SCWS_EINVAL);
 	a = scws_segment(ctx, embedded, sizeof(embedded) - 1, SCWS_STANDARD);
 	CHECK(a && scws_result_count(a) == 2);
 	first = scws_result_next(a);
@@ -97,7 +97,7 @@ static int exercise(const char *path, scws_dict_mode_t mode)
 	return 0;
 }
 
-static int ownership(const char *base, const char *overlay, scws_dict_mode_t mode)
+static int ownership(const char *base, const char *overlay, scws_dict_flags_t mode)
 {
 	scws_t ctx = scws_new();
 	CHECK(ctx);
@@ -129,7 +129,7 @@ static int ownership(const char *base, const char *overlay, scws_dict_mode_t mod
 	return 0;
 }
 
-static int nested_results(const char *base, const char *overlay, scws_dict_mode_t mode)
+static int nested_results(const char *base, const char *overlay, scws_dict_flags_t mode)
 {
 	scws_t ctx = scws_new();
 	scws_result_t outer, retained, large_result;
@@ -171,7 +171,7 @@ static int text_ownership(const char *base, const char *text, const char *malfor
 {
 	scws_t ctx = scws_new();
 	scws_result_t before, after;
-	CHECK(ctx && scws_set_dict(ctx, base, SCWS_DICT_MEMORY) == SCWS_OK);
+	CHECK(ctx && scws_set_dict(ctx, base, 0) == SCWS_OK);
 	before = scws_segment(ctx, "中国", 6, SCWS_STANDARD);
 	CHECK(before && !strcmp(scws_result_next(before)->pos, "ns"));
 	CHECK(scws_add_dict(ctx, text, SCWS_DICT_TEXT) == SCWS_OK);
@@ -191,18 +191,17 @@ static int text_ownership(const char *base, const char *text, const char *malfor
 	return 0;
 }
 
-#ifndef SCWS_NO_MMAP
 static int compare_modes(const char *path, const char *overlay)
 {
 	scws_t a = scws_new(), b = scws_new();
 	const char *texts[] = {"研究生命起源南京市长江大桥", "中文 C++ ２０２６年三点五公斤", "𠀀词未知词人工智能"};
 	CHECK(a && b);
-	CHECK(scws_set_dict(a, path, SCWS_DICT_MEMORY) == SCWS_OK);
+	CHECK(scws_set_dict(a, path, 0) == SCWS_OK);
 	CHECK(scws_set_dict(b, path, SCWS_DICT_MMAP) == SCWS_OK);
 	for (int layer = 0; layer < 2; layer++) {
 		if (layer) {
 			CHECK(scws_add_dict(a, overlay, SCWS_DICT_MMAP) == SCWS_OK);
-			CHECK(scws_add_dict(b, overlay, SCWS_DICT_MEMORY) == SCWS_OK);
+			CHECK(scws_add_dict(b, overlay, 0) == SCWS_OK);
 		}
 		for (size_t i = 0; i < sizeof(texts) / sizeof(texts[0]); i++) {
 			for (int mode = SCWS_STANDARD; mode <= SCWS_SEARCH; mode++) {
@@ -224,11 +223,12 @@ static int compare_modes(const char *path, const char *overlay)
 	return 0;
 }
 
+#ifndef SCWS_NO_MMAP
 static int replace_file(const char *path, const char *replacement)
 {
 	scws_t contexts[3] = {scws_new(), scws_new(), scws_new()};
 	CHECK(contexts[0] && contexts[1] && contexts[2]);
-	CHECK(scws_set_dict(contexts[0], path, SCWS_DICT_MEMORY) == SCWS_OK);
+	CHECK(scws_set_dict(contexts[0], path, 0) == SCWS_OK);
 	CHECK(scws_set_dict(contexts[1], path, SCWS_DICT_MMAP) == SCWS_OK);
 	CHECK(rename(replacement, path) == 0);
 	CHECK(scws_set_dict(contexts[2], path, SCWS_DICT_MMAP) == SCWS_OK);
@@ -249,7 +249,7 @@ int main(int argc, char **argv)
 	if (argc == 5 && !strcmp(argv[2], "text-result")) {
 		scws_free(ctx); return text_ownership(argv[1], argv[3], argv[4]);
 	}
-	CHECK(scws_set_dict(ctx, argv[1], (scws_dict_mode_t) 99) == SCWS_EINVAL);
+	CHECK(scws_set_dict(ctx, argv[1], (scws_dict_flags_t) 99) == SCWS_EINVAL);
 	CHECK(scws_error_code(ctx) == SCWS_EINVAL && !strcmp(scws_strerror(ctx), "invalid argument"));
 #ifndef SCWS_NO_MMAP
 	if (argc == 4 && !strcmp(argv[2], "replace")) {
@@ -258,24 +258,19 @@ int main(int argc, char **argv)
 #endif
 	/* Used by Python to check malformed files in either loading mode. */
 	if (argc == 4) {
-		scws_dict_mode_t mode = !strcmp(argv[2], "mmap") ? SCWS_DICT_MMAP : SCWS_DICT_MEMORY;
+		scws_dict_flags_t mode = !strcmp(argv[2], "mmap") ? SCWS_DICT_MMAP : 0;
 		scws_status_t expected = !strcmp(argv[3], "format") ? SCWS_EFORMAT : SCWS_EIO;
 		CHECK(scws_set_dict(ctx, argv[1], mode) == expected && scws_error_code(ctx) == expected);
 		scws_free(ctx); return 0;
 	}
 	CHECK(argc == 3);
-	CHECK(exercise(argv[1], SCWS_DICT_MEMORY) == 0);
-	CHECK(ownership(argv[1], argv[2], SCWS_DICT_MEMORY) == 0);
-	CHECK(nested_results(argv[1], argv[2], SCWS_DICT_MEMORY) == 0);
-#ifdef SCWS_NO_MMAP
-	CHECK(scws_set_dict(ctx, argv[1], SCWS_DICT_MMAP) == SCWS_ENOTSUP);
-	CHECK(scws_error_code(ctx) == SCWS_ENOTSUP && !strcmp(scws_strerror(ctx), "operation not supported"));
-#else
+	CHECK(exercise(argv[1], 0) == 0);
+	CHECK(ownership(argv[1], argv[2], 0) == 0);
+	CHECK(nested_results(argv[1], argv[2], 0) == 0);
 	CHECK(exercise(argv[1], SCWS_DICT_MMAP) == 0);
 	CHECK(ownership(argv[1], argv[2], SCWS_DICT_MMAP) == 0);
 	CHECK(nested_results(argv[1], argv[2], SCWS_DICT_MMAP) == 0);
 	CHECK(compare_modes(argv[1], argv[2]) == 0);
-#endif
 	scws_free(ctx);
 	return 0;
 }

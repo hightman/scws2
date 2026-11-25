@@ -2,7 +2,6 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 #include "xdb.h"
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +14,7 @@
 #define HEADER 64u
 #define TRAILER 8u
 #define MAX_DICTIONARY_BYTES (512u * 1024u * 1024u)
-struct scws_dict { unsigned char *data; uint32_t size, buckets, base; scws_dict_mode_t mode; };
+struct scws_dict { unsigned char *data; uint32_t size, buckets, base; scws_dict_flags_t flags; };
 
 static uint32_t u32(const unsigned char *p)
 {
@@ -83,7 +82,20 @@ static scws_status_t validate(scws_dict_t *dict)
 	return SCWS_OK;
 }
 
-scws_status_t scws_dict_open_ex(const char *path, scws_dict_mode_t mode, scws_dict_t **out)
+/* Takes ownership of data, including on failure. */
+scws_status_t scws_dict_from_data(unsigned char *data, uint32_t size, scws_dict_t **out)
+{
+	scws_dict_t *dict = calloc(1, sizeof(*dict));
+	scws_status_t status;
+	if (!dict) { free(data); return SCWS_ENOMEM; }
+	dict->data = data; dict->size = size; dict->flags = 0;
+	status = validate(dict);
+	if (status) { scws_dict_close(dict); return status; }
+	*out = dict;
+	return SCWS_OK;
+}
+
+scws_status_t scws_dict_open_ex(const char *path, scws_dict_flags_t flags, scws_dict_t **out)
 {
 	FILE *fp;
 	long length;
@@ -91,19 +103,10 @@ scws_status_t scws_dict_open_ex(const char *path, scws_dict_mode_t mode, scws_di
 	scws_status_t status;
 	if (!out) return SCWS_EINVAL;
 	*out = NULL;
-	if (!path || (mode != SCWS_DICT_MEMORY && mode != SCWS_DICT_MMAP && mode != SCWS_DICT_TEXT)) return SCWS_EINVAL;
-	if (mode == SCWS_DICT_TEXT) {
-		dict = calloc(1, sizeof(*dict));
-		if (!dict) return SCWS_ENOMEM;
-		dict->mode = SCWS_DICT_TEXT;
-		status = scws_text_load(path, &dict->data, &dict->size);
-		if (!status) status = validate(dict);
-		if (status) { scws_dict_close(dict); return status; }
-		*out = dict;
-		return SCWS_OK;
-	}
+	if (!path || flags & ~(SCWS_DICT_TEXT | SCWS_DICT_MMAP)) return SCWS_EINVAL;
+	if (flags & SCWS_DICT_TEXT) return scws_text_open(path, flags & SCWS_DICT_MMAP, out);
 #ifndef SCWS_HAVE_MMAP
-	if (mode == SCWS_DICT_MMAP) return SCWS_ENOTSUP;
+	flags = 0;
 #endif
 	fp = fopen(path, "rb");
 	if (!fp) return SCWS_EIO;
@@ -116,19 +119,16 @@ scws_status_t scws_dict_open_ex(const char *path, scws_dict_mode_t mode, scws_di
 	dict = calloc(1, sizeof(*dict));
 	if (!dict) { fclose(fp); return SCWS_ENOMEM; }
 	dict->size = (uint32_t) length;
-	dict->mode = mode;
+	dict->flags = flags;
 #ifdef SCWS_HAVE_MMAP
-	if (mode == SCWS_DICT_MMAP) {
+	if (flags == SCWS_DICT_MMAP) {
 		void *mapping = mmap(NULL, dict->size, PROT_READ, MAP_SHARED, fileno(fp), 0);
-		if (mapping == MAP_FAILED) {
-			status = errno == ENOMEM ? SCWS_ENOMEM : SCWS_EIO;
-			fclose(fp); free(dict); return status;
-		}
-		dict->data = mapping;
-		status = SCWS_OK;
-	} else
+		if (mapping == MAP_FAILED) dict->flags = 0;
+		else dict->data = mapping;
+	}
 #endif
-	{
+	status = SCWS_OK;
+	if (dict->flags != SCWS_DICT_MMAP) {
 		dict->data = malloc(dict->size);
 		if (!dict->data) { fclose(fp); free(dict); return SCWS_ENOMEM; }
 		status = fread(dict->data, 1, dict->size, fp) == dict->size ? SCWS_OK : SCWS_EIO;
@@ -143,7 +143,7 @@ void scws_dict_close(scws_dict_t *dict)
 {
 	if (!dict) return;
 #ifdef SCWS_HAVE_MMAP
-	if (dict->mode == SCWS_DICT_MMAP) munmap(dict->data, dict->size);
+	if (dict->flags == SCWS_DICT_MMAP) munmap(dict->data, dict->size);
 	else
 #endif
 		free(dict->data);

@@ -10,6 +10,7 @@ import struct
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -19,6 +20,9 @@ class CoreTests(unittest.TestCase):
     def setUpClass(cls):
         cls.temporary = tempfile.TemporaryDirectory()
         cls.root = Path(cls.temporary.name)
+        cls.environment = patch.dict(os.environ, {'TMPDIR': str(cls.root)})
+        cls.environment.start()
+        cls.addClassCleanup(cls.environment.stop)
         cls.cli = cls.root / 'scws'
         cls.compiler = cls.root / 'scws2-dict'
         cls.api = cls.root / 'api-test'
@@ -28,7 +32,7 @@ class CoreTests(unittest.TestCase):
                         '--output', str(cls.root / 'rules_data.h')], check=True)
         cc = shlex.split(os.environ.get('CC', 'cc'))
         flags = ['-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + shlex.split(os.environ.get('CORE_TEST_CFLAGS', '-O2'))
-        source = [str(ROOT / name) for name in ('src/scws.c', 'src/utf8.c', 'src/xdb.c', 'src/text.c', 'src/rules.c')]
+        source = [str(ROOT / name) for name in ('src/scws.c', 'src/utf8.c', 'src/xdb.c', 'src/text.c', 'src/text_cache.c', 'src/rules.c')]
         includes = ['-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src'), '-I' + str(cls.root)]
         for main, output, extra in [('cli/scws.c', cls.cli, []), ('tests/core_api.c', cls.api, ['-pthread']), ('tests/text_dict.c', cls.text_compiler, [])]:
             subprocess.run(cc + flags + includes + source + [str(ROOT / main), '-o', str(output)] + extra, check=True)
@@ -177,8 +181,12 @@ class CoreTests(unittest.TestCase):
         spec.loader.exec_module(validator)
         validator.check_xdb(raw)
         self.assertEqual(self.invoke('前缀长词', dictionary=raw), self.invoke('前缀长词', dictionary=path))
-        explicit = self.text_dictionary('特殊词', 'custom.data')
-        result = self.invoke('特殊词', '--text-dict', str(explicit))
+        explicit = self.text_dictionary('特殊词', 'custom.TXT')
+        result = self.invoke('特殊词', dictionary=explicit)
+        self.assertEqual([(t['word'], t['pos']) for t in result], [('特殊词', 'un')])
+        arbitrary = self.text_dictionary('特殊词', 'custom.data')
+        self.invoke('特殊词', dictionary=arbitrary, success=False)
+        result = self.invoke('特殊词', '--mmap', '-d', str(explicit))
         self.assertEqual([(t['word'], t['pos']) for t in result], [('特殊词', 'un')])
 
     def test_text_frequency_calibration_is_independent_of_file_size(self):

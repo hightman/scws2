@@ -14,7 +14,8 @@ typedef enum {
 	SCWS_OK = 0, SCWS_EINVAL, SCWS_ENOMEM, SCWS_EIO, SCWS_EFORMAT,
 	SCWS_EUTF8, SCWS_ELIMIT, SCWS_ENOTSUP
 } scws_status_t;
-typedef enum { SCWS_DICT_MEMORY = 0, SCWS_DICT_MMAP = 1, SCWS_DICT_TEXT = 2 } scws_dict_mode_t;
+typedef unsigned scws_dict_flags_t;
+enum { SCWS_DICT_MMAP = 1u << 0, SCWS_DICT_TEXT = 1u << 1 };
 typedef enum { SCWS_STANDARD = 0, SCWS_SEARCH = 1 } scws_mode_t;
 typedef enum { SCWS_PRIMARY = 0, SCWS_SECONDARY = 1, SCWS_FALLBACK = 2 } scws_kind_t;
 typedef enum { SCWS_DICTIONARY = 0, SCWS_BUILTIN = 1, SCWS_UNKNOWN = 2 } scws_origin_t;
@@ -33,11 +34,11 @@ scws_t scws_new(void);
 /* Frees the context and its dictionaries, not returned results; NULL is accepted. */
 void scws_free(scws_t ctx);
 /* Replace all dictionaries, or append an overlay. The context owns all loaded
- * data. Failure preserves the existing dictionaries. MEMORY is the default
- * mode (0); MMAP is read-only and never silently falls back to MEMORY.
- * TEXT reads UTF-8 term/frequency/POS rows into an owned memory dictionary. */
-scws_status_t scws_set_dict(scws_t ctx, const char *path, scws_dict_mode_t mode);
-scws_status_t scws_add_dict(scws_t ctx, const char *path, scws_dict_mode_t mode);
+ * data. Failure preserves existing dictionaries. Flags: 0 reads XDB into memory;
+ * TEXT compiles/caches UTF-8 rows; MMAP requests a read-only mapping of the XDB.
+ * TEXT | MMAP combines both. If mapping is unavailable, use memory instead. */
+scws_status_t scws_set_dict(scws_t ctx, const char *path, scws_dict_flags_t flags);
+scws_status_t scws_add_dict(scws_t ctx, const char *path, scws_dict_flags_t flags);
 /* Replaces all flags; defaults to 0. Does not change scoring parameters. */
 scws_status_t scws_set_options(scws_t ctx, unsigned flags);
 /* Advanced tuning only: cost must be nonzero; normally keep the default. */

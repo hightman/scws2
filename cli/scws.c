@@ -14,7 +14,7 @@ static int text_path(const char *path)
 }
 static void usage(FILE *fp)
 {
-	fputs("Usage: scws [-d dictionary.xdb|dictionary.txt] [--text-dict file] [--search] [--bigrams] [--symbols] [-i text]\n"
+	fputs("Usage: scws [--mmap] [-d dictionary.xdb|dictionary.txt] [--search] [--bigrams] [--symbols] [-i text]\n"
 		"UTF-8 only. Without -i, read stdin. Output: byte_offset, byte_length, char_offset,\n"
 		"char_length, POS, kind, origin, original token (tab-separated).\n", fp);
 }
@@ -24,6 +24,7 @@ int main(int argc, char **argv)
 	scws_result_t tokens = NULL;
 	size_t length = 0;
 	unsigned flags = 0;
+	scws_dict_flags_t dict_flags = 0;
 	scws_mode_t mode = SCWS_STANDARD;
 	const char *input = NULL;
 	char *owned = NULL;
@@ -33,13 +34,15 @@ int main(int argc, char **argv)
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) { usage(stdout); result = EXIT_SUCCESS; goto done; }
 		if (!strcmp(argv[i], "--version")) { puts(SCWS_VERSION); result = EXIT_SUCCESS; goto done; }
-		if (!strcmp(argv[i], "--search")) mode = SCWS_SEARCH;
+		if (!strcmp(argv[i], "--mmap")) dict_flags |= SCWS_DICT_MMAP;
+		else if (!strcmp(argv[i], "--search")) mode = SCWS_SEARCH;
 		else if (!strcmp(argv[i], "--bigrams")) flags |= SCWS_FALLBACK_BIGRAM;
 		else if (!strcmp(argv[i], "--symbols")) flags |= SCWS_KEEP_SYMBOLS;
 		else if (!strcmp(argv[i], "-i") && i + 1 < argc) input = argv[++i];
-		else if ((!strcmp(argv[i], "-d") || !strcmp(argv[i], "--text-dict")) && i + 1 < argc) {
-			int text = !strcmp(argv[i], "--text-dict") || text_path(argv[i + 1]);
-			status = scws_add_dict(ctx, argv[++i], text ? SCWS_DICT_TEXT : SCWS_DICT_MEMORY);
+		else if (!strcmp(argv[i], "-d") && i + 1 < argc) {
+			scws_dict_flags_t loading = dict_flags;
+			if (text_path(argv[i + 1])) loading |= SCWS_DICT_TEXT;
+			status = scws_add_dict(ctx, argv[++i], loading);
 			if (status) { fprintf(stderr, "%s: %s\n", argv[i], scws_strerror(ctx)); goto done; }
 		} else { usage(stderr); goto done; }
 	}

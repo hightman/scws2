@@ -5,14 +5,14 @@
 ## 类型与接口
 
 `scws_t`（上下文）和 `scws_result_t`（一次分词结果）均为不透明指针句柄，声明变量时无需再加 `*`。
-枚举使用 `scws_status_t`、`scws_dict_mode_t`、`scws_mode_t`、`scws_kind_t`、`scws_origin_t`；结果值类型为 `scws_token_t`，读取时使用 `const scws_token_t *`。这些类型均由本库定义，`_t` 是项目命名惯例。
+词典标志类型为 `scws_dict_flags_t`（unsigned）；枚举使用 `scws_status_t`、`scws_mode_t`、`scws_kind_t`、`scws_origin_t`；结果值类型为 `scws_token_t`，读取时使用 `const scws_token_t *`。这些类型均由本库定义，`_t` 是项目命名惯例。
 
 | 函数 | 用途 |
 | --- | --- |
 | `scws_t scws_new(void)` | 创建上下文，分配失败返回 NULL |
 | `void scws_free(scws_t ctx)` | 释放上下文及全部词典，不释放已返回结果 |
-| `scws_status_t scws_set_dict(scws_t ctx, const char *path, scws_dict_mode_t mode)` | 替换全部词典 |
-| `scws_status_t scws_add_dict(scws_t ctx, const char *path, scws_dict_mode_t mode)` | 追加叠加词典 |
+| `scws_status_t scws_set_dict(scws_t ctx, const char *path, scws_dict_flags_t flags)` | 替换全部词典 |
+| `scws_status_t scws_add_dict(scws_t ctx, const char *path, scws_dict_flags_t flags)` | 追加叠加词典 |
 | `scws_status_t scws_set_options(scws_t ctx, unsigned flags)` | 覆盖行为选项 |
 | `scws_status_t scws_set_unknown_cost(scws_t ctx, uint32_t cost)` | 高级未知单字代价调节 |
 | `scws_result_t scws_segment(scws_t ctx, const char *text, size_t length, scws_mode_t mode)` | 执行分词，成功返回独立结果，失败返回 NULL |
@@ -34,7 +34,7 @@ int main(void)
     scws_t ctx = scws_new();
     if (!ctx) return 1;
     const char *text = "中文分词测试";
-    scws_status_t status = scws_set_dict(ctx, "build/dict/dictionary.xdb", SCWS_DICT_MEMORY);
+    scws_status_t status = scws_set_dict(ctx, "build/dict/dictionary.xdb", 0);
     if (!status) status = scws_set_options(ctx, SCWS_KEEP_SYMBOLS);
     scws_result_t result = NULL;
     if (!status) {
@@ -61,22 +61,28 @@ int main(void)
 
 `scws_new()` 不加载词典，创建后即可使用内置英文、数字、数量规则及未知汉字单字兜底。需要正常中文词典切分时调用 `scws_set_dict()`。词典结构和打开/关闭函数属于内部接口，调用者管理上下文和每次返回的独立结果。
 
-`scws_set_dict(ctx, path, mode)` 成功后替换全部已有词典；`scws_add_dict()` 按顺序追加，同一完整词以后添加的定义为准，前缀信息取并集。两者失败均保留已有词典。`path` 不可为空，不自动寻找词典或隐式加载默认文件。修改词典影响后续分词，不重新计算已保存的结果。
+`scws_set_dict(ctx, path, flags)` 成功后替换全部已有词典；`scws_add_dict()` 按顺序追加，同一完整词以后添加的定义为准，前缀信息取并集。两者失败均保留已有词典。`path` 不可为空，不自动寻找词典或隐式加载默认文件。修改词典影响后续分词，不重新计算已保存的结果。
 
-加载方式显式传入，默认模式值为 0：
+加载参数是位标志，不依赖文件名或上一次调用：
 
-- `SCWS_DICT_MEMORY`（0）：整库 `fread` 到私有缓冲区；加载后不依赖原文件。
-- `SCWS_DICT_MMAP`（1）：只读映射 `PROT_READ`、`MAP_SHARED`，不整库复制或预读，多进程可共享文件页缓存。失败不自动退回 MEMORY；不支持时返回 `SCWS_ENOTSUP`。POSIX 构建启用，可用 `-DSCWS_NO_MMAP` 禁用。
+| flags | 输入格式 | 加载方式 |
+| --- | --- | --- |
+| `0` | XDB2 | 整库 `fread` 到私有缓冲区 |
+| `SCWS_DICT_MMAP` | XDB2 | 请求只读 mmap |
+| `SCWS_DICT_TEXT` | UTF-8 文本 | 编译/复用临时 XDB2，以内存方式加载 |
+| `SCWS_DICT_TEXT \| SCWS_DICT_MMAP` | UTF-8 文本 | 编译/复用临时 XDB2，请求只读 mmap |
 
-- `SCWS_DICT_TEXT`（2）：读取 UTF-8 文本词表，编译为上下文拥有的内存 XDB2；不写临时文件，不映射原始文本。
+`SCWS_DICT_MMAP = 1u << 0`，`SCWS_DICT_TEXT = 1u << 1`，两者可按位或；没有 MEMORY 或 AUTO 标志。只对未知位等无效参数返回 `SCWS_EINVAL`，四种合法组合均接受。不根据扩展名或文件内容自动猜测格式，指定错误格式会加载失败。
 
-MEMORY 和 MMAP 均读取 XDB2 schema 4，最多接受 512 MiB；只检查头部、尺寸、桶表范围、节点数量基本范围及尾标记，不遍历词条。完整检查由构建流水线执行。查询保留节点范围及遍历步数保护，不保证发现所有中间数据损坏。
+mmap 使用 `PROT_READ`、`MAP_SHARED`，多进程可共享文件页缓存。平台不支持、构建指定 `-DSCWS_NO_MMAP` 或映射失败时自动改用内存。内存加载后不依赖原文件；mmap 映射仍引用文件。没有按尺寸判断或 ctx 模式记忆。
 
-映射使用期间不得原地修改或截断文件。更新应生成新文件再替换路径，已有上下文继续引用旧文件，重新加载才使用新文件。所有模式均不自动监测更新。
+二进制均为 XDB2 schema 4，最多接受 512 MiB；打开时只检查头部、尺寸、桶表范围、节点数量基本范围及尾标记，不遍历词条。完整检查由构建流水线执行。查询保留节点范围及遍历步数保护，不保证发现所有中间数据损坏。
+
+映射使用期间不得原地修改或截断文件。更新应生成新文件再替换路径，已有上下文继续引用旧文件，重新加载才使用新文件。已加载的上下文不自动监测更新；重新加载 TEXT 时检查源文件元数据。
 
 `scws_free()` 自动关闭全部词典并释放上下文；已返回结果由调用方用 `scws_result_free()` 单独释放。各上下文独立拥有加载的数据；内存模式多次加载同一文件会产生独立副本，目前没有全局缓存或跨上下文词典句柄共享。不同线程可分别使用各自上下文，同一个上下文不能并发操作，同一个结果的游标也不能并发读取。
 
-叠加词典可把完整词标为只补词以阻止其参与主切分。当前没有运行时禁用词的 tombstone 标志，构建阶段的 `deny` 不等于删除另一份叠加词典中的词。
+XDB2 叠加词典可把完整词标为只补词以阻止其参与主切分。当前没有运行时禁用词的 tombstone 标志，构建阶段的 `deny` 不等于删除另一份叠加词典中的词。
 
 ## 文本词典
 
@@ -97,13 +103,44 @@ if (status) fprintf(stderr, "%s\n", scws_strerror(ctx));
 默认词频 0 un
 ```
 
-缺省词性为 `un`；词频为十进制 `uint32`，缺省或 `0` 均按最低频率 `1` 处理，不表示禁用。词性最多两字符，匹配 `[A-Za-z][A-Za-z0-9_-]?`；`nrt`、`nrfg` 映射为 `nr`，其他长标签报错。每词最多 240 个 UTF-8 字节，不允许包含空白或控制分隔符。所有完整词均参与主切分和搜索补词；同词重复时最后一行覆盖词频和词性。
+缺省词性为 `un`；词频为十进制 `uint32`，缺省或 `0` 均按最低频率 `1` 处理，不表示禁用。词性最多两字符，匹配 `[A-Za-z][A-Za-z0-9_-]?`；`nrt`、`nrfg` 映射为 `nr`，其他长标签报错。标签含义及填写建议见 [词性标注](dict/POS.md)。每词最多 240 个 UTF-8 字节，不允许包含空白或控制分隔符。所有完整词均参与主切分和搜索补词；同词重复时最后一行覆盖词频和词性。
 
 支持空行、行首可带空白的 `#` / `;` 整行注释、文件开头 BOM、CRLF 和末行无换行；不支持行尾注释。空词表、非法 UTF-8、负数/溢出词频或多余字段均加载失败，不改变原有词典。源文本及编译结果各限 512 MiB，单行最多 4095 字节（不含 LF）。
 
-词频使用固定参考代价 `max(0, round(18432 - 1024 * ln(max(frequency, 1))))`，不按当前文件总频率归一化，避免小型叠加词典把单词权重放大。数值越大越倾向整体成词，但不保证强制合并。默认最低频率是保守补词值；离线基础词典仍使用其流水线的归一化口径，两者不是统一语料频次统计。
+### 词频与权重
 
-加载完成即关闭文本文件；后续查询复用二进制词典路径。加载阶段有解析、排序和前缀构建的临时内存开销，大型基础词典或 PHP 多进程场景宜预编译 XDB2 并用 MMAP。
+词频是词条的相对切分权重，接受 `0..4294967295`，不是 TF-IDF，也不是必须由调用者统计的语料出现次数。缺省/零值按 `1` 处理。代价为 `max(0, round(18432 - 1024 * ln(max(frequency, 1))))`；频率每增加十倍，代价约降低 2358。代价越低越倾向整体成词，但最终仍比较整条切分路径。
+
+| 词频 | 约合代价 | 使用参考 |
+| ---: | ---: | --- |
+| 1 | 18432 | 默认最低权重，先补充词条资格 |
+| 10 | 16074 | 轻度提高整体成词倾向 |
+| 100 | 13716 | 自定义词可先从此档验证 |
+| 1000 | 11358 | 更强的整体成词倾向，须检查歧义句 |
+| 10000 | 9001 | 较高权重，谨慎使用 |
+| 100000 | 6643 | 很高权重，通常不宜批量赋值 |
+
+这些是当前公式的调参参考，不是经过检索评估的等级标准。参考常用词的上游频率时，需确认统计口径：锁定的 jieba 原始快照频率为 2..883634，中位数 3，90% 分位数 106，99% 分位数 2403；它不能代表应用自己的真实词频。没有可靠频率时先用默认值或 10..100，再比较 standard/search 的实际结果；有明确的整体词需求时逐步上调，同时验证相邻词和歧义句。约 6566 万以上代价已饱和为 0，继续加大无益。
+
+固定参考代价不按当前文件总频率归一化，避免小型叠加词典把单词权重放大。离线基础词典仍使用流水线的归一化口径，两者不是统一语料频次统计；TEXT 对同词覆盖会替换原代价，即使使用缺省频率也可能改变原有切分。
+
+### 临时缓存与加载模式
+
+macOS/Linux 默认在 `$TMPDIR/scws-text-<uid>/`（TMPDIR 未设时为 `/tmp/scws-text-<uid>/`）保存 XDB2。文件名包含规范化绝对路径的 64 位 FNV-1a 哈希、路径字节数、缓存版本及源文件元数据指纹；元数据包括尺寸、设备/inode、mtime/ctime 和纳秒部分。不逐次扫描或哈希源文件内容。相对路径和符号链接解析到同一文件时共享缓存；源文本必须存在且可读。
+
+缓存命中只做现有的 XDB2 轻量校验；损坏或失效则重新编译。未命中时对 `.lock` 文件加排他锁，取得锁后再检查，完整写入同目录唯一临时文件并关闭后 `rename` 发布。不会原地截断正在 mmap 的 XDB；进程退出时锁自动释放。目录权限 0700，缓存及锁文件 0600。编译期间源文件变化则失败，不发布该次结果。
+
+每次调用独立决定加载方式，TEXT 不继承之前的选择：
+
+```c
+scws_set_dict(ctx, "dictionary.xdb", SCWS_DICT_MMAP);
+scws_add_dict(ctx, "small.txt", SCWS_DICT_TEXT); /* 内存 */
+scws_add_dict(ctx, "large.txt", SCWS_DICT_TEXT | SCWS_DICT_MMAP); /* 请求 mmap */
+```
+
+缓存不可用时直接编译并使用内存，即使传入了 MMAP 也不因此失败。不支持 POSIX 缓存的平台或编译时指定 `-DSCWS_NO_TEXT_CACHE` 时也如此。首次编译有解析、排序和前缀构建的临时内存开销，后续加载可跨 ctx、跨进程复用缓存。
+
+源文件变化或缓存版本升级会生成新文件，不自动清理旧缓存及锁文件。可在没有加载任务时清理专用缓存目录，已有 mmap 上下文仍引用旧文件；下次加载自动重建。系统清理临时目录也不会删除源词表。大型基础词典仍建议通过正式流水线预编译并保留来源、许可与构建清单。
 
 ## 分词模式与结果
 
@@ -177,7 +214,7 @@ if (!outer) {
 | `SCWS_EFORMAT` | 词典格式错误 |
 | `SCWS_EUTF8` | 输入不是有效 UTF-8 |
 | `SCWS_ELIMIT` | 超出资源或尺寸限制 |
-| `SCWS_ENOTSUP` | 当前构建不支持指定加载方式 |
+| `SCWS_ENOTSUP` | 保留状态码；mmap 不可用会改用内存 |
 
 `scws_new()` 分配失败返回 NULL，此时没有可查询的 ctx，调用方按内存分配失败处理。`scws_error_code(NULL)` 返回 `SCWS_EINVAL`，`scws_strerror(NULL)` 返回 `invalid argument`。
 

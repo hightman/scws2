@@ -53,14 +53,14 @@ static void clear_dicts(scws_t ctx)
 	for (size_t i = 0; i < ctx->dict_count; i++) scws_dict_close(ctx->dicts[i]);
 	ctx->dict_count = 0;
 }
-static scws_status_t load_dict(scws_t ctx, const char *filename, scws_dict_mode_t mode, int replace)
+static scws_status_t load_dict(scws_t ctx, const char *filename, scws_dict_flags_t flags, int replace)
 {
 	scws_dict_t *dict = NULL;
 	scws_status_t status;
 	void *grown;
 	if (!ctx) return SCWS_EINVAL;
 	if (!replace && ctx->dict_count == SIZE_MAX) return SCWS_ELIMIT;
-	status = scws_dict_open_ex(filename, mode, &dict);
+	status = scws_dict_open_ex(filename, flags, &dict);
 	if (status) return status;
 	status = reserve(ctx->dicts, &ctx->dict_capacity, replace ? 1 : ctx->dict_count + 1,
 		sizeof(*ctx->dicts), &grown);
@@ -70,13 +70,13 @@ static scws_status_t load_dict(scws_t ctx, const char *filename, scws_dict_mode_
 	ctx->dicts[ctx->dict_count++] = dict;
 	return SCWS_OK;
 }
-scws_status_t scws_set_dict(scws_t ctx, const char *filename, scws_dict_mode_t mode)
+scws_status_t scws_set_dict(scws_t ctx, const char *filename, scws_dict_flags_t flags)
 {
-	return set_error(ctx, load_dict(ctx, filename, mode, 1));
+	return set_error(ctx, load_dict(ctx, filename, flags, 1));
 }
-scws_status_t scws_add_dict(scws_t ctx, const char *filename, scws_dict_mode_t mode)
+scws_status_t scws_add_dict(scws_t ctx, const char *filename, scws_dict_flags_t flags)
 {
-	return set_error(ctx, load_dict(ctx, filename, mode, 0));
+	return set_error(ctx, load_dict(ctx, filename, flags, 0));
 }
 scws_t scws_new(void)
 {

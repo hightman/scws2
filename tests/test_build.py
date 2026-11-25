@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class BuildTests(unittest.TestCase):
     def test_rule_generation_is_automatic_and_incremental(self):
         files = ['Makefile', 'include/scws.h', 'cli/scws.c', 'cli/scws2-dict.c', 'tools/gen_rules.py',
-                 'src/scws.c', 'src/utf8.c', 'src/utf8.h', 'src/xdb.c', 'src/xdb.h', 'src/text.c',
+                 'src/scws.c', 'src/utf8.c', 'src/utf8.h', 'src/xdb.c', 'src/xdb.h', 'src/text.c', 'src/text_cache.c',
                  'src/rules.c', 'src/rules.h', 'src/rules.ini']
         with tempfile.TemporaryDirectory(prefix='scws2-build-test-') as temporary:
             root = Path(temporary)
