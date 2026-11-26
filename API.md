@@ -34,7 +34,7 @@ int main(void)
     scws2_t ctx = scws2_new();
     if (!ctx) return 1;
     const char *text = "中文分词测试";
-    scws2_status_t status = scws2_set_dict(ctx, "build/dict/dictionary.xdb", 0);
+    scws2_status_t status = scws2_set_dict(ctx, "dict/build/dict.xdb", 0);
     if (!status) status = scws2_set_options(ctx, SCWS2_KEEP_SYMBOLS);
     scws2_result_t result = NULL;
     if (!status) {
@@ -55,7 +55,7 @@ int main(void)
 }
 ```
 
-构建后可用 `cc -Iinclude example.c build/libscws2.a -o example` 链接静态库。
+构建后可用 `cc -Iinclude example.c .libs/libscws2.a -o example` 链接静态库。
 
 ## 词典与生命周期
 
@@ -135,7 +135,7 @@ macOS/Linux 默认在 `$TMPDIR/scws2-text-<uid>/`（TMPDIR 未设时为 `/tmp/sc
 每次调用独立决定加载方式，TEXT 不继承之前的选择，默认同样请求 mmap：
 
 ```c
-scws2_set_dict(ctx, "dictionary.xdb", 0); /* 默认 mmap */
+scws2_set_dict(ctx, "dict.xdb", 0); /* 默认 mmap */
 scws2_add_dict(ctx, "small.txt", SCWS2_DICT_TEXT | SCWS2_DICT_MEMORY); /* 强制内存 */
 scws2_add_dict(ctx, "large.txt", SCWS2_DICT_TEXT); /* 默认 mmap */
 ```
@@ -199,7 +199,7 @@ if (!outer) {
 
 搜索模式的词典补词尚无经过评估的歧义置信度过滤。例如旧基础词典可能包含“京市”“据库”，某些上下文也会召回不同切分路径的词。应用应区分主词、补词与兜底片段，不能把所有输出无差别当成必选查询条件。需要真实检索评估后再确定默认补词策略和权重。
 
-`src/rules.ini` 统一保留简繁符号、数字和数量单位数据。`make` 根据规则源和生成器的修改时间自动生成 `build/rules_data.h`，重新编译后生效；生成代码不进入 Git，规则源不作为运行配置安装，运行时不读取 INI。旧词性倍率、姓名、地名及统计规则已移除。数据约束和支持边界见 `src/RULES.md`。
+`src/rules.ini` 统一保留简繁符号、数字和数量单位数据。`make` 根据规则源和生成器的修改时间自动生成 `generated/rules_data.h`，重新编译后生效；生成代码不进入 Git，规则源不作为运行配置安装，运行时不读取 INI。旧词性倍率、姓名、地名及统计规则已移除。数据约束和支持边界见 `src/RULES.md`。
 
 ## 状态码
 

@@ -8,19 +8,24 @@
 
 2.0 状态以根目录 `README.md` 为准，公共 API 契约见 `API.md`。`include/scws2.h` 为公共接口，`src/` 为核心与 XDB2 加载器，`tools/scws2.c` 为 CLI。`dict/README.md` 描述词典流水线，`dict/FORMAT.md` 定义 XDB2 字节契约，`dict/sources.lock.json` 锁定上游。`dict/build.py` 负责获取和加工，`tools/scws2-dict.c` 为纯 C 编译器；`tests/` 包含离线词典/核心集成测试及原生 C API 测试。
 
-旧引擎、字符集层、Autotools 构建及历史演示已移除；SCWS 1.x 实现和历史保留在[原 SCWS 仓库](https://github.com/hightman/scws)；本仓库历史从新版开发开始。`phpext/` 提供 PHP 7.0+ 的最小 Scws2 对象接口，完整仓库内通过 phpize 构建，不链接系统 libscws2；契约及验证范围见 `phpext/README.md` 与 `phpext/DESIGN.md`。`src/rules.ini` 为简繁共用的 UTF-8 规则源，仅维护符号、数字及单位，契约见 `src/RULES.md`。不要修改原 SCWS 仓库或清理用户原有文件。
+旧引擎、字符集层及历史演示已移除；当前使用 Autoconf/Automake/Libtool；SCWS 1.x 实现和历史保留在[原 SCWS 仓库](https://github.com/hightman/scws)；本仓库历史从新版开发开始。`phpext/` 提供 PHP 7.0+ 的最小 Scws2 对象接口，通过 phpize 和 --with-scws2=DIR 构建，动态链接已安装的 libscws2，不再嵌入核心；契约及验证范围见 `phpext/README.md` 与 `phpext/DESIGN.md`。`src/rules.ini` 为简繁共用的 UTF-8 规则源，仅维护符号、数字及单位，契约见 `src/RULES.md`。不要修改原 SCWS 仓库或清理用户原有文件。
 
 ## 开发与验证
 
 ```sh
+./bootstrap.sh
+./configure --prefix=/tmp/scws2-local
 make -j2
 make check
-make dict
-python3 dict/build.py check build/dict/dictionary.xdb
-build/scws2 -d build/dict/dictionary.xdb --search -i '中文分词测试'
+make install
+(cd dict && make && make install PREFIX=/tmp/scws2-local)
 ```
 
-`make dict` 自动校验词典源缓存，缺失或校验失败时下载锁定来源，再构建；单独的 `dict/build.py build` 保持离线。普通 make 和 install 不触发词典下载或构建；install 仅将已有且较新的词典及许可/清单安装到 `$PREFIX/etc`，支持 DESTDIR 和并行 `make dict install`。显式词典 fetch 或 `make fetch-eval` 也可能联网；默认测试不依赖上游或本机词典。`build/`、`.cache/` 和 Python 缓存不提交，源词典快照应另行归档。运行库与词典编译器保持纯 C；Python 用于构建时生成规则表、离线加工、校验和测试。`make` 根据 `src/rules.ini` 和生成器的修改时间自动更新 `build/rules_data.h`；该文件及其他生成代码不提交 Git。`make rules` 可手动强制生成。
+VERSION 是唯一版本来源，初始 0.1.1，奇数 patch 为开发版；正式偶数版打 vX.Y.Z tag，发布后递增奇数开发版。release.sh 默认只准备资产，--publish 才执行提交、tag、推送和 GitHub Release；未经明确发布授权，不执行 --publish。
+
+核心发行包必须附带 configure、Makefile.in 和 generated/rules_data.h，普通 configure/make/install 不依赖 Python 或 Autotools。Git 开发与打包需要 Python、Autoconf、Automake、Libtool；生成文件不提交 Git。修改 src/rules.ini 后重新生成规则表。
+
+核心不递归构建或安装词典。dict/ 是同仓库独立子项目，make 校验缓存并按需下载固定源，构建 build/dict.xdb；make install 安装到 PREFIX/etc，支持 DESTDIR、前缀探测和原子替换。预构建日期包安装无需 Python。缓存和生成产物不提交。
 
 核心变更需要验证主路径、重叠补词、原文偏移、非法 UTF-8、词典损坏、上下文/结果独立生命周期、嵌套结果遍历、上下文错误隔离、词典替换失败保持原状态及独立上下文线程安全。`CORE_TEST_CFLAGS`、`DICT_TEST_CFLAGS` 可覆盖测试编译选项以启用 ASan/UBSan。不要将代码测试通过等同于真实检索质量验收。
 

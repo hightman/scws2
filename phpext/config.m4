@@ -1,30 +1,24 @@
-PHP_ARG_ENABLE(scws2, whether to enable scws2,
-  [  --enable-scws2         Enable the scws2 UTF-8 segmenter], no)
+PHP_ARG_WITH(scws2, installed scws2 library prefix,
+  [  --with-scws2=DIR        Link the installed shared libscws2 in DIR], no)
 
 if test "$PHP_SCWS2" != "no"; then
-  SCWS2_ROOT=`cd "$srcdir/.." && pwd`
-  if test ! -f "$SCWS2_ROOT/include/scws2.h" || test ! -f "$SCWS2_ROOT/src/rules.ini"; then
-    AC_MSG_ERROR([Build phpext from the complete scws2 repository])
+  if test "$PHP_SCWS2" = "yes"; then
+    AC_MSG_ERROR([Specify --with-scws2=/absolute/installation/prefix])
   fi
-  AC_PATH_PROG([SCWS2_PYTHON], [python3], [no])
-  if test "$SCWS2_PYTHON" = "no"; then
-    AC_MSG_ERROR([Python 3.9+ is required to generate the embedded rule tables])
+  SCWS2_PREFIX="$PHP_SCWS2"
+  if test ! -f "$SCWS2_PREFIX/include/scws2.h" || test ! -f "$SCWS2_PREFIX/include/scws2_version.h"; then
+    AC_MSG_ERROR([Installed scws2 headers not found in $SCWS2_PREFIX/include])
   fi
-  "$SCWS2_PYTHON" -c 'import sys; sys.exit(sys.version_info < (3, 9))' || AC_MSG_ERROR([Python 3.9+ is required])
+  if test ! -f "$SCWS2_PREFIX/lib/libscws2.so" && test ! -f "$SCWS2_PREFIX/lib/libscws2.dylib"; then
+    AC_MSG_ERROR([Shared libscws2 not found in $SCWS2_PREFIX/lib])
+  fi
   AC_MSG_CHECKING([for PHP 7.0 or newer])
   SCWS2_PHP_VERSION=`$PHP_CONFIG --vernum`
-  if test "$SCWS2_PHP_VERSION" -lt 70000; then
-    AC_MSG_ERROR([scws2 requires PHP 7.0 or newer])
-  fi
+  if test "$SCWS2_PHP_VERSION" -lt 70000; then AC_MSG_ERROR([scws2 requires PHP 7.0+]); fi
   AC_MSG_RESULT([yes])
-  "$SCWS2_PYTHON" -B "$SCWS2_ROOT/tools/gen_rules.py" --output rules_data.h || AC_MSG_ERROR([Cannot generate rule tables])
-  PHP_ADD_INCLUDE([$SCWS2_ROOT/include])
-  PHP_ADD_INCLUDE([$SCWS2_ROOT/src])
-  PHP_ADD_INCLUDE([$abs_builddir])
-  PHP_NEW_EXTENSION(scws2, scws2.c engine/scws2.c engine/utf8.c engine/xdb.c engine/text.c engine/text_cache.c engine/rules.c,
-    $ext_shared,, [-std=c11 -Wall -Wextra -fvisibility=hidden])
-  PHP_ADD_BUILD_DIR([$ext_builddir/engine])
-  PHP_SUBST(SCWS2_ROOT)
-  PHP_SUBST(SCWS2_PYTHON)
-  PHP_ADD_MAKEFILE_FRAGMENT
+  PHP_ADD_INCLUDE([$SCWS2_PREFIX/include])
+  PHP_CHECK_LIBRARY(scws2, scws2_new, [], [AC_MSG_ERROR([Cannot link the installed libscws2])], [-L$SCWS2_PREFIX/lib])
+  PHP_ADD_LIBRARY_WITH_PATH(scws2, [$SCWS2_PREFIX/lib], SCWS2_SHARED_LIBADD)
+  PHP_SUBST(SCWS2_SHARED_LIBADD)
+  PHP_NEW_EXTENSION(scws2, scws2.c, $ext_shared,, [-std=c11 -Wall -Wextra])
 fi

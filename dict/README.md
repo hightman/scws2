@@ -6,44 +6,40 @@
 
 本目录集中维护词典流水线及其输入：`build.py` 提供下载、加工、构建、校验和差异报告；`sources.lock.json` 锁定来源，`overrides.tsv` 保存人工修订，`jieba.LICENSE` 保存数据许可，`FORMAT.md` 定义 XDB2 格式。
 
-通用纯 C 词典编译器位于 `tools/scws2-dict.c`。原始下载保存在 `.cache/dict/`，构建产物保存在 `build/dict/`；两者均不进入 Git，不混入本目录。
+通用纯 C 词典编译器位于 `tools/scws2-dict.c`。原始下载保存在 `dict/.cache/`，构建产物保存在 `.cache/`；两者均不进入 Git，不混入本目录。
 
-## 构建
+## 独立构建
 
-在仓库根目录执行。需要 C11 编译器和 Python 3.9+，均不依赖第三方包。
-
-```sh
-make dict
-python3 dict/build.py check build/dict/dictionary.xdb
-python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
-```
-
-`make dict` 自动调用 `fetch` 后再 `build`：先按 `sources.lock.json` 的尺寸与 SHA-256 校验缓存，只下载缺失或不匹配的源文件；下载验证成功后原子替换缓存，失败不覆盖旧文件。不检查浮动分支或远端更新时间。可单独执行 `python3 dict/build.py fetch`；直接调用 `python3 dict/build.py build` 仍保持离线，缓存不存在或校验失败时退出。发布包使用预先生成的 XDB，无需 Python 或网络。独立 C 编译器接受 `lexicon.tsv output.xdb`，不依赖 Python。
-
-输出目录 `build/dict/` 包含：
-
-- `lexicon.tsv`：UTF-8 字节序排序的四列 `term / cost / flags / pos`，最后一列可为空。
-- `dictionary.xdb`：保留可选词性、不含 IDF 的 XDB2 schema 4 文件，包含固定尾标记；旧 schema 1/2/3 产物需重建。
-- `manifest.json`：来源 commit、源文件 SHA-256、加工版本与代码指纹、编译器指纹、修订及结果校验和、统计。
-- `LICENSE.jieba`：随词典分发的上游 MIT 许可。引擎许可参见根目录 `COPYING`。
-
-## 安装
+在本目录执行，不需要先构建核心库。维护词典需要 C11 编译器和 Python 3.9+，不依赖第三方 Python 包。
 
 ```sh
-make dict install PREFIX="$HOME/.local"
-# 打包安装时同样支持 DESTDIR
-make dict install PREFIX=/usr/local DESTDIR=/tmp/scws2-package
+cd dict
+make
+make check
+make install PREFIX="$HOME/.local/scws2"
 ```
 
-普通 `make` 不包含词典；`make install` 只检查已构建的 `build/dict/dictionary.xdb`，不触发下载或构建。目标缺失或源修改时间较新时安装为 `$PREFIX/etc/dictionary.xdb`，同时复制已有的 `LICENSE.jieba` 和 `manifest.json`；目标同样新或更新则跳过词典。使用 `DESTDIR` 时，实际路径在该暂存根目录下。
+`make` 先编译纯 C 的词典编译器，再按 sources.lock.json 的尺寸和 SHA-256 校验 `.cache/`。仅在缓存缺失或不匹配时下载固定版本，验证成功后原子替换，不查询浮动上游。`python3 build.py build` 仍为离线入口；`fetch` 可以单独执行。
 
-安装保留源文件修改时间，以临时文件加原子替换更新 XDB，不原地截断 mmap 文件；已有上下文继续使用旧文件，新加载才使用新版。`make -j4 dict install` 也会先完成词典构建，失败则不执行安装。词典路径需由 C/PHP 调用方指定，不隐式加载安装目录。`lexicon.tsv` 不安装。
+输出在 `dict/build/`：`dict.xdb` 是固定名称的运行时词典，`lexicon.tsv` 是加工词表，`manifest.json` 记录来源、加工、编译器及结果哈希，`LICENSE.jieba` 是上游许可。缓存和产物不提交 Git。
+
+## 安装与预构建包
+
+显式 PREFIX 优先；未指定时查询父项目 configure 的前缀，再依次检查 `/usr/local`、`/usr/local/scws2`、`~/.local/scws2`。自动选择必须找到 `include/scws2.h`，否则报错要求 PREFIX，不只检查目录是否存在。显式 PREFIX 可创建新目录。
+
+```sh
+make install PREFIX=/usr/local/scws2 DESTDIR=/tmp/scws2-package
+```
+
+安装为 `$PREFIX/etc/dict.xdb`，附带 LICENSE.jieba 和 manifest.json；不安装词表或编译器。目标同样新或更新则跳过；以同目录临时文件和原子替换更新词典，不截断正在 mmap 的旧文件。C/PHP 调用方须显式指定路径。`make install` 不下载或构建，缺少产物时报错。
+
+发布包 `scws2-dict-YYYYMMDD.tar.gz` 直接附带词典和安装 Makefile，解压后 `make install PREFIX=...` 即可，不需要 Python、C 编译器或完整源码仓库。日期使用 UTC+8，词典发布与核心版本独立，也可附于同一个核心 Release。未变化的词典通过固定历史资产 URL 复用，不覆盖同名资产。
 
 ## 固定来源
 
 首个基础源是 [jieba 标准词典](https://github.com/fxsjy/jieba/blob/master/jieba/dict.txt)，由 `sources.lock.json` 锁定完整 commit、字典与许可文件的 URL、大小和 SHA-256。当前快照所在提交是 2020 年，提供基础词表，不代表现代新词覆盖已经解决。THUOCL、输入法词典尚未接入，也未完成其逐文件来源审计。
 
-首次获取后，应将原始缓存作为发布归档的一部分保存；Git 不跟踪 `.cache/dict/` 和构建产物。第三方来源不与引擎代码混用许可证。
+首次获取后，应将原始缓存作为发布归档的一部分保存；Git 不跟踪 `dict/.cache/` 和构建产物。第三方来源不与引擎代码混用许可证。
 
 ## 加工与权重
 
@@ -73,7 +69,7 @@ make dict install PREFIX=/usr/local DESTDIR=/tmp/scws2-package
 
 ## 更新与发布
 
-更新时修改完整 commit 和两个源文件的校验信息，先归档旧缓存与输出目录用于比较；下次 `make dict` 会按新锁文件重新下载不匹配的源文件，也可指定独立缓存目录手动 fetch/build。先检查新增、删除、频率及切分差异，通过检索评估后再发布；不自动追踪浮动分支、不自动发布。
+更新时修改完整 commit 和两个源文件的校验信息，先归档旧缓存与输出目录用于比较；下次 `make` 会按新锁文件重新下载不匹配的源文件，也可指定独立缓存目录手动 fetch/build。先检查新增、删除、频率及切分差异，通过检索评估后再发布；不自动追踪浮动分支、不自动发布。
 
 可用 `python3 dict/build.py diff build/dict-old build/dict-new` 比较两个加工目录，输出新增、删除、代价、用途与词性变化统计及有限样例；`--limit` 控制样例数。支持比较旧的无词性加工目录与当前四列词表。评分分母随主词集合变化，一次修订可能影响很多词的代价，须结合实际切分差异判断。
 

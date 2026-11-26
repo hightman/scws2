@@ -1,3 +1,6 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #endif
@@ -6,8 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if !defined(SCWS2_NO_MMAP) && (defined(__unix__) || defined(__APPLE__))
-#define SCWS2_HAVE_MMAP 1
+#if defined(SCWS2_HAVE_MMAP) && !defined(SCWS2_NO_MMAP)
 #include <sys/mman.h>
 #endif
 
@@ -116,7 +118,7 @@ scws2_status_t scws2_dict_open_ex(const char *path, scws2_dict_flags_t flags, sc
 	dict = calloc(1, sizeof(*dict));
 	if (!dict) { fclose(fp); return SCWS2_ENOMEM; }
 	dict->size = (uint32_t) length;
-#ifdef SCWS2_HAVE_MMAP
+#if defined(SCWS2_HAVE_MMAP) && !defined(SCWS2_NO_MMAP)
 	if (!(flags & SCWS2_DICT_MEMORY)) {
 		void *mapping = mmap(NULL, dict->size, PROT_READ, MAP_SHARED, fileno(fp), 0);
 		if (mapping != MAP_FAILED) { dict->data = mapping; dict->mapped = 1; }
@@ -137,7 +139,7 @@ scws2_status_t scws2_dict_open_ex(const char *path, scws2_dict_flags_t flags, sc
 void scws2_dict_close(scws2_dict_t *dict)
 {
 	if (!dict) return;
-#ifdef SCWS2_HAVE_MMAP
+#if defined(SCWS2_HAVE_MMAP) && !defined(SCWS2_NO_MMAP)
 	if (dict->mapped) munmap(dict->data, dict->size);
 	else
 #endif

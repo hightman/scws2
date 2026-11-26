@@ -1,0 +1,4 @@
+#ifndef SCWS2_VERSION_H
+#define SCWS2_VERSION_H
+#define SCWS2_VERSION "@PACKAGE_VERSION@"
+#endif

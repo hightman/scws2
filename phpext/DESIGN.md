@@ -1,3 +1,5 @@
+> 构建契约已更新：本扩展通过 `--with-scws2=DIR` 动态链接已安装的 libscws2，不再内嵌 engine 源码或生成规则表。具体构建步骤以 README.md 为准，以下对象及数据接口契约继续适用。
+
 # scws2 PHP 扩展设计
 
 状态：首版已实现。本文维护 PHP 接口及内部边界；构建方式和实际验证范围见 [README.md](README.md)。
@@ -101,7 +103,7 @@ PHP 与核心采用一致的加载策略，格式由 PHP 根据后缀补充：`$
 
 ```php
 $scws = (new Scws2())
-    ->setDict('/srv/app/dict/dictionary.xdb')
+    ->setDict('/srv/app/dict/dict.xdb')
     ->addDict('/srv/app/dict/user.txt')
     ->setOptions(Scws2::KEEP_SYMBOLS);
 
@@ -114,7 +116,7 @@ foreach ($tokens as $token) {
 $words = array_column($tokens, 'word');
 
 // 长期运行 CLI 可按需强制内存加载；此对象独立拥有词典。
-$cli = (new Scws2())->setDict('/srv/app/dict/dictionary.xdb', Scws2::DICT_MEMORY);
+$cli = (new Scws2())->setDict('/srv/app/dict/dict.xdb', Scws2::DICT_MEMORY);
 
 // 内层分词不改变外层结果。
 foreach ($tokens as $token) {
@@ -176,18 +178,18 @@ API、示例及测试辅助脚本以 PHP 7.0 可用语法为基线。无需 null
 
 扩展使用手写 PHP 7.0 兼容 arginfo；PHP 8 的参数解析、对象分配及序列化防护差异集中在小型兼容头中，业务方法共用实现。以实际 PHP 7.0 头文件为基线，不能仅在 PHP 7.4 编译后宣称兼容；[PHP 7.0 Zend API 源码](https://github.com/php/php-src/blob/PHP-7.0/Zend/zend_API.h)是实现时的核对来源。
 
-首版构建方案：
+当前构建方案：
 
-1. 从完整 scws2 仓库直接构建 `phpext/`，无需先运行根目录 make，也无需先安装 libscws2。不支持只下载 phpext 目录，不面向 PECL 独立源码包发布。
-2. 提供 `config.m4`，使用 `phpize` / `./configure --enable-scws2` / `make` / `make test`。没有用于选择外部库的 `--with-scws2`。
-3. `engine/*.c` 仅包含对应的 `../../src/*.c`，编译仓库同版本核心，保留默认缓存能力，不链接系统 libscws2。模块使用 hidden visibility，仅导出 PHP 模块入口，避免与已安装的 libscws2 冲突。
-4. configure 调用 `tools/gen_rules.py` 生成规则头；make 追踪规则源、生成器、核心源和头文件的修改，增量更新扩展。使用独立对象与规则头，不改写根目录 build 产物。
-5. 使用匹配的 phpize、php-config 及 PHP 可执行文件构建和测试。模块版本来自 SCWS2_VERSION；MINFO 显示版本、UTF-8、mmap 回退语义及文本缓存构建能力。
+1. 先构建并安装核心共享库，再使用 phpext/ 构建扩展；扩展不包含核心实现，不面向 PECL 独立源码包发布。
+2. 提供 config.m4，使用 phpize / ./configure --with-scws2=DIR / make / make test。指定安装前缀缺少头文件或共享库时 configure 报错。
+3. config.m4 接收 --with-scws2=DIR，仅编译 PHP 封装并动态链接指定前缀的 libscws2；不编译 engine 源码或生成规则。核心能力由已安装共享库决定。
+4. 扩展 configure/make 不调用 Python，不生成规则，也不依赖核心源码目录；规则和平台能力由已安装的核心库提供。
+5. 使用匹配的 phpize、php-config 及 PHP 可执行文件构建和测试。模块版本来自 SCWS2_VERSION；MINFO 显示版本、UTF-8、mmap 回退语义及共享核心链接方式。
 
 ```sh
 cd phpext
 phpize
-./configure --enable-scws2 --with-php-config=/path/to/php-config
+./configure --with-scws2=/usr/local/scws2 --with-php-config=/path/to/php-config
 make -j2
 make test
 make install
@@ -195,7 +197,7 @@ make install
 
 在相应 PHP 配置中启用 `extension=scws2.so`。扩展不安装词典、不新增 INI 指令。Windows `config.w32` 与二进制分发不纳入首版平台验收；最低 PHP 版本不等于所有操作系统都已受支持。
 
-文件组织为 `scws2.c`（模块、类、方法和生命周期）、`php_scws2.h`、`compat.h`（必要版本适配）、`config.m4`、`engine/*.c`（核心源码编译入口）、`Makefile.frag`（增量依赖）、`tests/*.phpt`。无需拆出配置框架、结果类或通用封装层。
+文件组织为 `scws2.c`（模块、类、方法和生命周期）、`php_scws2.h`、`compat.h`（必要版本适配）、`config.m4`、`tests/*.phpt`。无需拆出配置框架、结果类或通用封装层。
 
 ## 7. 实施顺序与验收
 

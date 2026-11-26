@@ -30,8 +30,9 @@ class CoreTests(unittest.TestCase):
         cls.text_compiler = cls.root / 'text-compiler-test'
         subprocess.run([os.sys.executable, '-B', str(ROOT / 'tools/gen_rules.py'),
                         '--output', str(cls.root / 'rules_data.h')], check=True)
+        (cls.root / 'scws2_version.h').write_text('#define SCWS2_VERSION "' + (ROOT / 'VERSION').read_text().strip() + '"\n')
         cc = shlex.split(os.environ.get('CC', 'cc'))
-        flags = ['-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + shlex.split(os.environ.get('CORE_TEST_CFLAGS', '-O2'))
+        flags = ['-DSCWS2_HAVE_MMAP=1', '-DSCWS2_HAVE_TEXT_CACHE=1', '-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + shlex.split(os.environ.get('CORE_TEST_CFLAGS', '-O2'))
         source = [str(ROOT / name) for name in ('src/scws2.c', 'src/utf8.c', 'src/xdb.c', 'src/text.c', 'src/text_cache.c', 'src/rules.c')]
         includes = ['-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src'), '-I' + str(cls.root)]
         for main, output, extra in [('tools/scws2.c', cls.cli, []), ('tests/core_api.c', cls.api, ['-pthread']), ('tests/text_dict.c', cls.text_compiler, [])]:

@@ -33,63 +33,80 @@ scws2 源自 [SCWS 1.x](https://github.com/hightman/scws) 的词典分词思路�
 
 当前是可运行原型，尚未通过真实检索质量和完整跨平台验收。搜索补词的歧义筛选仍需评估，算法替换不会自动解决旧词和新词不足问题。正式发布前须用分词及小型检索评估集衡量召回、误召回、词数、内存和速度；未验证的词典更新不自动发布。
 
-## 构建与运行
+## 构建与安装
 
-需要支持 C11 的 GCC/Clang、GNU Make、ar 和 Python 3.9+。当前已在 macOS 验证；Linux 及其他平台尚未完成验证，系统默认 make 不是 GNU Make 时需使用 `gmake`。Python 用于构建时生成规则表、词典加工及测试，运行时不需要。
+源码发行包 `scws2-0.x.y.tar.gz` 已包含 configure、构建模板和生成好的规则表。常规构建只需 C11 编译器、Make、ar 和系统开发工具，不需要 Python、Autoconf、Automake 或 Libtool。macOS 已本机验证，Linux/macOS CI 已配置；实际 CI 通过范围以 Actions 结果为准，其他 Unix 尚未完成验收。
 
 ```sh
+./configure --prefix="$HOME/.local/scws2"
 make -j2
-make check
-
-# 词典单独构建：自动校验缓存，按需下载锁定的源文件
-make dict
-
-build/scws2 -d build/dict/dictionary.xdb --search -i '中文分词测试'
-printf '南京市长江大桥\n' | build/scws2 -d build/dict/dictionary.xdb
+make install
 ```
 
-普通 `make` / `make all` 仅构建库、CLI 和词典编译器，不包含词典。`make dict` 先按锁文件校验缓存，缺失或校验失败时下载对应源文件，再构建 XDB2；有效缓存不会联网，也不检查上游浮动版本。默认测试不联网，直接执行 `python3 dict/build.py build` 仍为离线构建。
+库为 `libscws2`，公共头文件安装到 `include/`，库和 pkg-config 文件到 `lib/`，演示程序 `scws2` 到 `bin/`。`make install DESTDIR=/tmp/scws2-package` 可用于打包暂存；安装前缀通过 configure 的 `--prefix` 指定。核心构建和安装不下载、构建或安装词典。
 
-辅助程序统一放在 `tools/`：`scws2.c` 用于分词测试，`scws2-dict.c` 用于编译词典，与评测及规则生成工具共同维护。
+mmap 和文本缓存接口由 configure 检测；可显式使用 `--disable-mmap`、`--disable-text-cache`。mmap 不可用或映射失败时退回内存。共享库使用 Libtool 管理 ABI 版本（初始 ABI 0），与项目版本分开维护。自定义安装路径需让应用能在运行时找到共享库。
 
-CLI 主要用于开发测试，调用层显式使用 `SCWS2_DICT_MEMORY`，默认整库读入内存。`-d file` 根据扩展名选择格式：`.txt`（大小写不敏感）为 UTF-8 文本，其余为 XDB2。`--mmap` 为后续词典参数请求 mmap；不可用时退回内存。可重复 `-d` 叠加词典，后加载的同词定义优先。
-
-CLI 可不传 `-d`，此时仅使用内置规则和未知字符兜底。默认读取全部标准输入，以 TSV 输出字节跨度、字符跨度、词性、种类、来源和原词。`--search` 增加检索补词，`--bigrams` 可在搜索模式开启未知汉字二元兜底，`--symbols` 保留符号。
-
-## 安装与构建参数
-
-`make install` 默认安装到 `/usr/local`，`PREFIX` 不必填写。自定义目录可直接传 Make 变量，无需先设置环境变量：
+Git 源码开发需要额外安装 Autoconf、Automake、Libtool 和 Python 3.9+：
 
 ```sh
-make install PREFIX="$HOME/.local"
-
-# 构建词典后一起安装；也支持 make -j4 dict install
-make dict install PREFIX="$HOME/.local"
-
-# 打包暂存：写入 /tmp/scws2-package/usr/local/，不修改系统安装目录
-make install PREFIX=/usr/local DESTDIR=/tmp/scws2-package
+./bootstrap.sh                  # 生成规则表、configure 及构建模板，不提交生成文件
+./configure --prefix="$HOME/.local/scws2"
+make -j2
+make check                      # 开发测试需要 Python，不联网
 ```
 
-安装内容为 `include/scws2.h`、`lib/libscws2.a`、`lib/libscws2.so`（macOS 为 `.dylib`），以及 `bin/scws2`、`bin/scws2-dict`。
+修改规则后 make 会重新生成规则表，此时需要 Python。发行包中的规则表已生成，普通用户无需重新生成。`make clean` 清理核心编译产物，不清理独立词典。
 
-如果 `build/dict/dictionary.xdb` 存在，且目标缺失或源文件修改时间较新，还会安装到 `etc/dictionary.xdb`，并一同复制已有的 `LICENSE.jieba`、`manifest.json`；目标同样新或更新时跳过词典，不覆盖。词典更新使用同目录临时文件再原子替换，不截断已有 mmap。
+辅助程序位于 `tools/`。`scws2` 仅供分词测试：`-d file` 将 `.txt`（大小写不敏感）视为文本，其余为 XDB2；`--mmap` 请求 mmap，默认使用内存。`--search` 开启搜索补词，`--symbols` 保留符号，`--bigrams` 开启搜索模式的未知汉字二元补词。
 
-`make install` 不下载或构建词典；`make dict install` 则先成功完成词典构建，再安装，支持并行 make。运行时规则已编译进库，不另安装；词典路径仍由调用方传入。PHP 扩展从完整仓库单独通过 phpize 构建，不由根目录安装，无需先安装 libscws2，见 [扩展说明](phpext/README.md)。
+```sh
+./scws2 -d dict/build/dict.xdb --search -i '中文分词测试'
+```
 
-| 变量 | 默认值 | 用途 |
-| --- | --- | --- |
-| `PREFIX` | `/usr/local` | 安装前缀，影响 include/lib/bin/etc 位置 |
-| `DESTDIR` | 空 | 打包暂存根目录，实际位置为 `DESTDIR + PREFIX` |
-| `CC` / `AR` | `cc` / `ar` | C 编译器及静态库归档工具 |
-| `PYTHON` | `python3` | 构建及测试使用的 Python 解释器 |
-| `CFLAGS` | `-O2` | 编译选项；C11、警告和 PIC 选项由 Makefile 另外添加 |
-| `LDFLAGS` | 空 | 链接选项 |
+PHP 扩展单独通过 phpize 构建，动态链接已安装的共享库，无需 Python，不再嵌入核心源文件：
 
-例如 `make CC=clang CFLAGS='-O0 -g'` 可生成调试构建。修改编译器或编译选项后先运行 `make clean`，Make 不会自动跟踪变量值变化。`make clean` 会删除整个 `build/`，包括已构建词典和本地评测输出；下载源保留在 `.cache/`，词典可重新构建。命令行变量优先于环境变量，且不会保存到后续 make 调用；需要连续使用时，应重复传入或显式导出环境变量。
+```sh
+cd phpext
+phpize
+./configure --with-scws2="$HOME/.local/scws2"
+make -j2
+make test
+make install
+```
 
-当前不使用 configure 探测 mmap；`src/xdb.c` 在 Unix/macOS 平台宏存在且未定义 `SCWS2_NO_MMAP` 时编译 mmap 路径，其余平台使用内存加载。可运行 `make -B CFLAGS='-O2 -DSCWS2_NO_MMAP'` 强制重建为禁用 mmap 的版本，无需删除已有词典；编译选项须在后续构建中保持一致。运行时映射失败也自动回退 fread。
+扩展的 PHP 版本要求及接口见 [phpext/README.md](phpext/README.md)。
 
-C 程序可使用 `cc -I"$HOME/.local/include" example.c "$HOME/.local/lib/libscws2.a" -o example` 链接本地安装的静态库。使用共享库时，需按目标系统配置运行时库搜索路径。
+## 独立词典
+
+词典位于同仓库 `dict/` 子项目，构建需要 Python 3.9+ 和 C11 编译器，不依赖已编译的核心库：
+
+```sh
+cd dict
+make                            # 校验缓存，按需下载锁定源，生成 build/dict.xdb
+make install PREFIX="$HOME/.local/scws2"
+```
+
+可省略 PREFIX 自动探测父项目已配置的安装前缀，再依次检查 `/usr/local`、`/usr/local/scws2`、`~/.local/scws2`；自动候选必须存在 `include/scws2.h`。没有有效候选时报错，需显式指定 PREFIX；不会只因 `/usr/local` 目录存在就选用。支持 `DESTDIR`，安装为 `$PREFIX/etc/dict.xdb` 并附带许可和清单；目标同样新或更新则跳过，以原子替换更新 XDB。
+
+预构建词典单独发布为 `scws2-dict-YYYYMMDD.tar.gz`，包含 `dict.xdb`、许可、清单和安装脚本，安装无需 Python 或编译器。调用方仍须显式指定词典路径。详细来源、处理规则及安装说明见 [dict/README.md](dict/README.md)。
+
+## 版本与发布
+
+版本事实来源为 `VERSION`；初始开发版为 `0.1.1`，首次正式发布为 `0.1.2`。patch 奇数为开发版，不打发布 tag、不创建 Release；偶数为正式版。C 库、CLI、PHP 扩展使用同一版本来源。
+
+```sh
+./release.sh --dry-run           # 检查版本选择，0.1.1 -> 0.1.2 -> 0.1.3
+./release.sh                     # 构建、测试并准备 dist/ 资产；不打 tag 或推送
+./release.sh 0.2.0               # 可显式指定更高的偶数 patch 版本
+./release.sh --publish           # 验证后提交正式版本、打 tag、推送并创建 GitHub Release
+```
+
+发布者需要完整开发环境、PHP 开发工具及 Python；`--publish` 还需已登录的 GitHub CLI `gh` 和仓库推送权限。脚本要求工作区干净。正式 tag 为 `v0.1.2` 这种形式，与源码包版本一致；发布后立即提交下一奇数开发版本，正式 tag 不移动或覆盖。脚本会验证源码包在禁用 Python 的目录外构建中可编译安装，并测试 PHP 动态链接。
+
+同一 Release 可同时包含核心包、日期命名的词典包和 SHA256SUMS。词典按最终 XDB、许可、来源及加工元数据判断变化；未变时在 Release 说明中链接此前资产，不重复上传。`dict/LAST_RELEASE.json` 记录已发布词典。词典日期使用 UTC+8；同日不同内容不能覆盖同名资产。
+
+网络发布失败时，脚本保留已创建的正式提交/tag 和本地资产，不强制回滚或覆盖远程历史。应先检查 GitHub Release/远程 tag 状态，补齐失败步骤，再将 VERSION 更新为下一奇数并提交；不要直接再次运行以覆盖已有 tag。
 
 ## 分词用例对照
 
@@ -120,7 +137,7 @@ python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
 
 规则统一在 `src/rules.ini`，同一份 UTF-8 数据同时维护简繁写法，只保留符号、中文数字和数量单位。内置识别支持明确的中文整数、小数、金融数字、序数和数字加单位，不进行姓名、地名猜测或词性倍率打分。
 
-`make` 按规则源和生成器的修改时间自动更新 `build/rules_data.h` 并重新编译，`make rules` 可手动强制生成。生成代码不进入 Git，运行时不读取 INI；详细边界见 [src/RULES.md](src/RULES.md)。
+`make` 按规则源和生成器的修改时间自动更新 `generated/rules_data.h` 并重新编译，`make rules` 可手动强制生成。生成代码不进入 Git，运行时不读取 INI；详细边界见 [src/RULES.md](src/RULES.md)。
 
 2.0 不兼容 1.x 的 API 和 XDB。旧字符集代码、旧引擎、Autotools 构建及历史 PHP 演示已移除，可从 [原 SCWS 仓库](https://github.com/hightman/scws)查阅。旧 PHP 扩展不再作为 2.0 可构建组件发布。
 

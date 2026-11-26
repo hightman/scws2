@@ -14,7 +14,7 @@ static int text_path(const char *path)
 }
 static void usage(FILE *fp)
 {
-	fputs("Usage: scws2 [--mmap] [-d dictionary.xdb|dictionary.txt] [--search] [--bigrams] [--symbols] [-i text]\n"
+	fputs("Usage: scws2 [--mmap] [-d dict.xdb|dictionary.txt] [--search] [--bigrams] [--symbols] [-i text]\n"
 		"UTF-8 only. Without -i, read stdin. Output: byte_offset, byte_length, char_offset,\n"
 		"char_length, POS, kind, origin, original token (tab-separated).\n", fp);
 }

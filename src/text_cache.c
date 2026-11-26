@@ -1,3 +1,6 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 /* Optional POSIX disk cache for compiled text dictionaries. */
 #if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
 #define _DARWIN_C_SOURCE
@@ -13,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if !defined(SCWS2_NO_TEXT_CACHE) && (defined(__unix__) || defined(__APPLE__))
+#if defined(SCWS2_HAVE_TEXT_CACHE) && !defined(SCWS2_NO_TEXT_CACHE)
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -117,7 +120,7 @@ scws2_status_t scws2_text_open(const char *path, scws2_dict_flags_t flags, scws2
 	if (!path || !out || (flags & ~SCWS2_DICT_MEMORY))
 		return SCWS2_EINVAL;
 	*out = NULL;
-#if !defined(SCWS2_NO_TEXT_CACHE) && (defined(__unix__) || defined(__APPLE__))
+#if defined(SCWS2_HAVE_TEXT_CACHE) && !defined(SCWS2_NO_TEXT_CACHE)
 	char *source = realpath(path, NULL), *cache = NULL;
 	struct stat before, after;
 	int locked = -1;

@@ -69,7 +69,7 @@ def generate(root=ROOT):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
-    parser.add_argument('--output', type=Path, default=ROOT / 'build/rules_data.h')
+    parser.add_argument('--output', type=Path, default=ROOT / 'generated/rules_data.h')
     args = parser.parse_args()
     output = args.output
     try:

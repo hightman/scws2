@@ -1,15 +1,14 @@
 # scws2 PHP 扩展
 
-扩展名 `scws2`，仅提供一个 `final class Scws2`，最低 PHP 7.0。无函数式调用、公开属性或 C 资源句柄；UTF-8 分词核心直接编译进模块。完整契约见 [DESIGN.md](DESIGN.md)。
+扩展名 `scws2`，仅提供一个 `final class Scws2`，最低 PHP 7.0。无函数式调用、公开属性或 C 资源句柄；扩展动态链接已安装的共享库 libscws2，分词核心不编译进模块。完整契约见 [DESIGN.md](DESIGN.md)。
 
 ## 构建
 
-必须下载完整 scws2 仓库，再进入 `phpext/` 构建。无需先运行根目录 make、构建词典或安装 libscws2；不支持单独下载 phpext，也不提供 `--with-scws2`。构建依赖目标 PHP 的开发头文件、phpize、php-config、C11 编译器、Make、Autoconf 和 Python 3.9+。Python 仅用于生成编译期规则表，运行扩展不需要 Python。
-
+先安装核心共享库及头文件，再进入 `phpext/`。构建需要目标 PHP 的开发头文件、phpize、php-config、C11 编译器、Make 和 phpize 所需的 Autoconf；不需要 Python 或规则生成器。`--with-scws2=DIR` 显式指定核心安装前缀，检查头文件、共享库及链接符号，缺失时报错，不回退内嵌编译。
 ```sh
 cd phpext
 phpize
-./configure --enable-scws2
+./configure --with-scws2=/usr/local/scws2
 make -j2
 make test
 
@@ -23,22 +22,22 @@ make install
 
 ```sh
 /path/to/php/bin/phpize
-./configure --enable-scws2 --with-php-config=/path/to/php/bin/php-config
+./configure --with-scws2=/usr/local/scws2 --with-php-config=/path/to/php/bin/php-config
 make -j2
 TEST_PHP_EXECUTABLE=/path/to/php/bin/php make test
 ```
 
 不同 PHP 版本的模块不可混用；切换版本时使用干净源码副本重新 phpize。也支持在单独构建目录执行生成的 configure。engine 目录只保存一行 include 的编译入口，不复制核心实现；扩展的对象文件和规则表与根目录构建独立，修改核心源、头文件或规则后重新 make 即可更新。
 
-本次受限 macOS 环境中，旧 PHP 自带 libtool 无法读取 kern.argmax，需要在 configure 前指定 `lt_cv_sys_max_cmd_len=65536`，例如 `lt_cv_sys_max_cmd_len=65536 ./configure --enable-scws2`。这是旧构建工具的环境适配，不改变扩展接口或核心行为。
+本次受限 macOS 环境中，旧 PHP 自带 libtool 无法读取 kern.argmax，需要在 configure 前指定 `lt_cv_sys_max_cmd_len=65536`，例如 `lt_cv_sys_max_cmd_len=65536 ./configure --with-scws2=/usr/local/scws2`。这是旧构建工具的环境适配，不改变扩展接口或核心行为。
 
-`/usr/local` 中已安装的 libscws2 不影响扩展：头文件来自仓库，核心源码使用独立对象编译入模块，不链接系统库，内部核心符号不对外导出。
+扩展使用 --with-scws2 指定前缀中的头文件和共享库；同一机器上的其他 libscws2 安装不应混入该构建。运行时仍需确认共享库解析到预期安装位置。
 
 ## 用法
 
 ```php
 $scws = (new Scws2())
-    ->setDict('/srv/app/dict/dictionary.xdb')
+    ->setDict('/srv/app/dict/dict.xdb')
     ->addDict('/srv/app/dict/user.txt')
     ->setOptions(Scws2::KEEP_SYMBOLS);
 
@@ -98,3 +97,5 @@ $words = array_column($tokens, 'word');
 另已验证：无根目录构建产物的源码副本直接构建、核心/规则的增量更新、模块仅导出 get_module 且不依赖系统 libscws2；根目录 make check 的 66 项测试通过。PHP 7.0 环境从官方 7.0.33 源码构建，使用兼容当前 macOS SDK 的探测参数与系统 libresolv，不修改仓库核心。
 
 Linux、其他 PHP 小版本、其他版本的 ZTS 及真实 FPM/mod_php 服务进程尚未完成验收；Windows 构建不在首版范围。接口测试通过不代表真实检索质量验收通过。
+
+共享库 ABI 由 Libtool 的版本信息管理，与项目版本分开。扩展应链接构建时匹配的核心；升级不兼容 ABI 时需重新构建扩展。自定义前缀必须配置运行时库搜索路径（Linux 可使用系统 ldconfig 或 LD_LIBRARY_PATH，macOS 使用对应 dylib 安装路径）。可用 `ldd modules/scws2.so`（Linux）或 `otool -L modules/scws2.so`（macOS）检查动态依赖。模块版本取自核心安装的 scws2_version.h，与 VERSION 一致。

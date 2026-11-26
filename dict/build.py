@@ -14,6 +14,7 @@ import tempfile
 import unicodedata
 import urllib.request
 
+BASE = Path(__file__).resolve().parent
 PIPELINE_VERSION = 3
 MAIN, SEARCH, PREFIX = 1, 2, 4
 SCALE = 1024
@@ -324,13 +325,13 @@ def main():
     sub = parser.add_subparsers(dest='command', required=True)
     for name in ('fetch', 'prepare', 'build'):
         cmd = sub.add_parser(name)
-        cmd.add_argument('--lock', default='dict/sources.lock.json')
-        cmd.add_argument('--cache', default='.cache/dict')
+        cmd.add_argument('--lock', default=str(BASE / 'sources.lock.json'))
+        cmd.add_argument('--cache', default=str(BASE / '.cache'))
         if name != 'fetch':
-            cmd.add_argument('--overrides', default='dict/overrides.tsv')
-            cmd.add_argument('--output', default='build/dict')
+            cmd.add_argument('--overrides', default=str(BASE / 'overrides.tsv'))
+            cmd.add_argument('--output', default=str(BASE / 'build'))
         if name == 'build':
-            cmd.add_argument('--compiler', default='build/scws2-dict')
+            cmd.add_argument('--compiler', default=str(BASE / 'build/scws2-dict'))
     sub.add_parser('check').add_argument('file')
     cmd = sub.add_parser('diff')
     cmd.add_argument('before')
@@ -357,12 +358,12 @@ def main():
             with tempfile.TemporaryDirectory(prefix='.dict-build-', dir=out.parent) as temporary:
                 stage = Path(temporary)
                 manifest = prepare(lock, args.cache, args.overrides, stage)
-                subprocess.run([str(compiler), str(stage / 'lexicon.tsv'), str(stage / 'dictionary.xdb')], check=True)
-                manifest['xdb'] = check_xdb(stage / 'dictionary.xdb')
+                subprocess.run([str(compiler), str(stage / 'lexicon.tsv'), str(stage / 'dict.xdb')], check=True)
+                manifest['xdb'] = check_xdb(stage / 'dict.xdb')
                 if manifest['xdb']['search_entries'] != manifest['entries']:
                     raise ValueError('compiled dictionary entry count mismatch')
                 manifest['compiler_sha256'] = digest(compiler.read_bytes())
-                for name in ('lexicon.tsv', 'LICENSE.jieba', 'dictionary.xdb'):
+                for name in ('lexicon.tsv', 'LICENSE.jieba', 'dict.xdb'):
                     atomic_write(out / name, (stage / name).read_bytes())
                 atomic_write(out / 'manifest.json', json_bytes(manifest))
         else:

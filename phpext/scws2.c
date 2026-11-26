@@ -290,11 +290,7 @@ PHP_MINFO_FUNCTION(scws2)
 	php_info_print_table_row(2, "Version", PHP_SCWS2_VERSION);
 	php_info_print_table_row(2, "Encoding", "UTF-8");
 	php_info_print_table_row(2, "Dictionary loading", "mmap by default, memory fallback");
-#if !defined(SCWS2_NO_TEXT_CACHE) && (defined(__unix__) || defined(__APPLE__))
-	php_info_print_table_row(2, "Text dictionary disk cache", "enabled (managed by libscws2)");
-#else
-	php_info_print_table_row(2, "Text dictionary disk cache", "disabled at build time");
-#endif
+	php_info_print_table_row(2, "Core linkage", "shared libscws2");
 	php_info_print_table_end();
 }
 static const zend_module_dep scws2_deps[] = {

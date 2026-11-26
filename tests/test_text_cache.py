@@ -18,8 +18,9 @@ class TextCacheTests(unittest.TestCase):
         cls.bin = Path(cls.compilation.name)
         subprocess.run([os.sys.executable, '-B', str(ROOT / 'tools/gen_rules.py'),
                         '--output', str(cls.bin / 'rules_data.h')], check=True)
+        (cls.bin / 'scws2_version.h').write_text('#define SCWS2_VERSION "' + (ROOT / 'VERSION').read_text().strip() + '"\n')
         cc = shlex.split(os.environ.get('CC', 'cc'))
-        flags = ['-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + shlex.split(os.environ.get('CORE_TEST_CFLAGS', '-O2'))
+        flags = ['-DSCWS2_HAVE_MMAP=1', '-DSCWS2_HAVE_TEXT_CACHE=1', '-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror'] + shlex.split(os.environ.get('CORE_TEST_CFLAGS', '-O2'))
         includes = ['-I' + str(ROOT / p) for p in ('include', 'src')] + ['-I' + str(cls.bin)]
         sources = [str(ROOT / p) for p in ('src/text.c', 'src/text_cache.c', 'src/utf8.c', 'src/rules.c', 'tests/cache_api.c')]
         for name, definitions in [('normal', []), ('no-mmap', ['-DSCWS2_NO_MMAP']),

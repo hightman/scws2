@@ -9,7 +9,7 @@
 
 ```sh
 make
-make dict                       # 需要已获取的词典源
+(cd dict && make)               # 独立构建，按需获取锁定来源
 make fetch-eval                 # 显式下载锁定的公开语料和评分脚本
 make eval                       # 只评测当前 scws2
 make eval EVAL_ARGS='--samples 3 --seconds 0.2'  # 缩短试跑

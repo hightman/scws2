@@ -6,7 +6,7 @@
 ```sh
 make cases                       # 逐句观察，差异不影响退出码
 make check-cases                 # 严格比较，有差异时失败
-make cases CASES=/path/to/cases.json CASE_DICT=/path/to/dictionary.xdb
+make cases CASES=/path/to/cases.json CASE_DICT=/path/to/dict.xdb
 python3 tools/check_segments.py --case case-07-standard --case case-07-search
 ```
 

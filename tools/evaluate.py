@@ -96,7 +96,8 @@ def decode_spans(texts, raw):
 
 def compile_engine(output, cc):
     run([sys.executable, '-B', ROOT / 'tools/gen_rules.py', '--output', output / 'rules_data.h'])
-    command = cc + ['-O2', '-std=c11', '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src'),
+    (output / 'scws2_version.h').write_text('#define SCWS2_VERSION "' + (ROOT / 'VERSION').read_text().strip() + '"\n')
+    command = cc + ['-DSCWS2_HAVE_MMAP=1', '-DSCWS2_HAVE_TEXT_CACHE=1', '-O2', '-std=c11', '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src'),
                     '-I' + str(output)]
     command += [str(ROOT / 'src' / name) for name in ('scws2.c', 'utf8.c', 'xdb.c', 'text.c', 'text_cache.c', 'rules.c')]
     binary = output / 'bench-scws2'
@@ -156,7 +157,7 @@ def machine_info(cc):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--dict', type=Path, default=ROOT / 'build/dict/dictionary.xdb')
+    parser.add_argument('--dict', type=Path, default=ROOT / 'dict/build/dict.xdb')
     parser.add_argument('--dataset', choices=('pku', 'msr'), default='pku')
     parser.add_argument('--reference', type=Path, help='Override dataset with UTF-8 gold, whitespace-separated words per line')
     parser.add_argument('--output', type=Path)

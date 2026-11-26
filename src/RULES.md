@@ -26,7 +26,7 @@ make
 make check
 ```
 
-`make` 自动生成 `build/rules_data.h`：规则源或 `tools/gen_rules.py` 比生成文件新，或生成文件不存在时，先生成再编译。生成器依赖 Python 3，故首次构建需要 Python；运行不需要。`make rules` 保留为手动强制重新生成入口。
+`make` 自动生成 `generated/rules_data.h`：规则源或 `tools/gen_rules.py` 比生成文件新，或生成文件不存在时，先生成再编译。Git 开发阶段生成器依赖 Python 3；发行包已附带规则表，普通构建和运行均不需要 Python。`make rules` 保留为手动强制重新生成入口。
 
 Git 只跟踪规则源和生成器，生成表位于已忽略的 `build/`。`make check` 校验表与源数据是否一致；规则源属于编译输入，不作为运行配置安装。更改规则需要重新构建，不能仅靠部署 INI 改变运行行为。
 
