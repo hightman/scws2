@@ -16,7 +16,7 @@ make test
 make install
 ```
 
-在该 PHP 使用的 php.ini 中加入 `extension=scws2.so`，通过 `php --ri scws2` 查看模块信息。本扩展不安装词典、不新增 INI 配置。需要中文词典时自行准备 XDB2 或文本词表并传入路径。
+在该 PHP 使用的 php.ini 中加入 `extension=scws2.so`，通过 `php --ri scws2` 查看模块信息。本扩展不安装词典、不新增 INI 配置。需要中文词典时，按[根目录词典说明](../README.md#词典准备与配置)下载预构建词典或自行构建，再通过 setDict() 显式指定实际路径；不会自动加载 PREFIX/etc/dict.xdb。
 
 机器上存在多个 PHP 时，应使用同一安装目录的工具：
 
@@ -27,7 +27,7 @@ make -j2
 TEST_PHP_EXECUTABLE=/path/to/php/bin/php make test
 ```
 
-不同 PHP 版本的模块不可混用；切换版本时使用干净源码副本重新 phpize。也支持在单独构建目录执行生成的 configure。engine 目录只保存一行 include 的编译入口，不复制核心实现；扩展的对象文件和规则表与根目录构建独立，修改核心源、头文件或规则后重新 make 即可更新。
+不同 PHP 版本的模块不可混用；切换版本时使用干净源码副本重新 phpize。也支持在单独构建目录执行生成的 configure。扩展仅编译 PHP 封装并链接已安装的核心共享库；修改核心实现后需重新构建和安装核心库，扩展不再编译 engine 源码或规则表。
 
 本次受限 macOS 环境中，旧 PHP 自带 libtool 无法读取 kern.argmax，需要在 configure 前指定 `lt_cv_sys_max_cmd_len=65536`，例如 `lt_cv_sys_max_cmd_len=65536 ./configure --with-scws2=/usr/local/scws2`。这是旧构建工具的环境适配，不改变扩展接口或核心行为。
 

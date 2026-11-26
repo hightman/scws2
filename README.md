@@ -2,6 +2,8 @@
 
 面向社区、CMS 等通用全文检索的纯 C 词典分词工具包。仅支持 UTF-8；运行时无第三方依赖，不提供关键词提取和 IDF。C 接口见 [API.md](API.md)。
 
+**核心库和 PHP 扩展不内置通用中文词典。安装程序后，还需单独准备词典，并在调用时指定词典路径。** 可[下载预构建词典或自行构建](#词典准备与配置)。
+
 scws2 源自 [SCWS 1.x](https://github.com/hightman/scws) 的词典分词思路，是独立维护的新项目，不是原项目的兼容升级。C API、PHP 扩展接口及 XDB2 词典格式均与 SCWS 1.x 不兼容，不能直接替换；库名为 `libscws2`，头文件为 `scws2.h`，C 符号使用 `scws2_` 前缀，PHP 扩展命名为 `scws2`，以支持两代实现并存。
 
 本仓库历史从新版词典流水线的首次提交开始，不包含 SCWS 1.x 提交历史；原项目代码、历史及旧 PHP 扩展请查阅上述来源仓库。原作者信息及许可证保留在 `AUTHORS` 和 `COPYING`。
@@ -77,9 +79,27 @@ make install
 
 扩展的 PHP 版本要求及接口见 [phpext/README.md](phpext/README.md)。
 
-## 独立词典
+## 词典准备与配置
 
-词典位于同仓库 `dict/` 子项目，构建需要 Python 3.9+ 和 C11 编译器，不依赖已编译的核心库：
+词典与核心库独立分发。以下两种方式任选其一；只运行核心的 configure、make、make install，或安装 PHP 扩展，都不会自动下载、安装或加载词典。
+
+### 方式一：下载 GitHub 发布的词典
+
+直接使用时可到 [GitHub Releases](https://github.com/hightman/scws2/releases) 下载 `scws2-dict-YYYYMMDD.tar.gz`，无需自行构建，也不需要 Python 或 C 编译器。词典包包含 `dict.xdb`、许可、清单和安装脚本；可使用发布页提供的 SHA256SUMS 校验下载文件。
+
+将以下日期占位符替换为实际下载的文件名：
+
+```sh
+tar -xzf scws2-dict-YYYYMMDD.tar.gz
+cd scws2-dict-YYYYMMDD
+make install PREFIX="$HOME/.local/scws2"
+```
+
+如果当前核心 Release 未附带词典，按其说明中的固定链接下载此前发布的词典包；词典不必与核心同日发布。若尚无预构建词典资产，则使用下面的自行构建方式。核心源码包 `scws2-0.x.y.tar.gz` 不包含预构建的 `dict.xdb`，不要将它误认为词典包。
+
+### 方式二：自行构建词典
+
+需要维护、修改词典，或尚无可下载词典包时，可使用源码中的 `dict/` 子项目。构建需要 Python 3.9+、C11 编译器和 Make，不依赖已编译的核心库。在 scws2 源码目录中执行：
 
 ```sh
 cd dict
@@ -87,9 +107,30 @@ make                            # 校验缓存，按需下载锁定源，生成 
 make install PREFIX="$HOME/.local/scws2"
 ```
 
-可省略 PREFIX 自动探测父项目已配置的安装前缀，再依次检查 `/usr/local`、`/usr/local/scws2`、`~/.local/scws2`；自动候选必须存在 `include/scws2.h`。没有有效候选时报错，需显式指定 PREFIX；不会只因 `/usr/local` 目录存在就选用。支持 `DESTDIR`，安装为 `$PREFIX/etc/dict.xdb` 并附带许可和清单；目标同样新或更新则跳过，以原子替换更新 XDB。
+有效缓存不会联网；来源锁定、人工修订和加工规则见 [dict/README.md](dict/README.md)。
 
-预构建词典单独发布为 `scws2-dict-YYYYMMDD.tar.gz`，包含 `dict.xdb`、许可、清单和安装脚本，安装无需 Python 或编译器。调用方仍须显式指定词典路径。详细来源、处理规则及安装说明见 [dict/README.md](dict/README.md)。
+### 指定词典路径
+
+以上两种方式均将词典安装为 `$PREFIX/etc/dict.xdb`，附带许可和清单。PREFIX 建议与核心安装前缀一致，但运行时不会自动搜索该目录，仍需由调用方显式指定：
+
+```c
+/* ctx 已由 scws2_new() 创建；替换为实际的词典绝对路径。 */
+scws2_set_dict(ctx, "/absolute/path/to/scws2/etc/dict.xdb", 0);
+```
+
+```php
+$scws = (new Scws2())->setDict('/absolute/path/to/scws2/etc/dict.xdb');
+```
+
+已安装的测试工具可这样使用：
+
+```sh
+"$HOME/.local/scws2/bin/scws2" -d "$HOME/.local/scws2/etc/dict.xdb" --search -i '中文分词测试'
+```
+
+也可不执行词典安装，直接传入解压目录或 `dict/build/` 中的 `dict.xdb` 路径。未加载词典时程序仍可运行，但只有内置规则和未知字兜底，不能代替正常中文词典分词。
+
+词典安装支持 DESTDIR、前缀自动探测和原子替换；目标同样新或更新时跳过。具体行为见 [词典安装说明](dict/README.md#安装与预构建包)。
 
 ## 版本与发布
 
@@ -119,7 +160,7 @@ python3 tools/check_segments.py --case case-07-standard --case case-07-search
 逐句显示输入、分词、词性与预期差异，支持自定义 JSON 用例和叠加词典。
 样例集中在 `tests/cases/`。每句分别验证 standard 和 search，预期以已接受的新版结果为准；第 7 句保留已知主路径缺陷，严格比较会报告失败。配置与退出码见 [用例说明](tests/cases/README.md)。
 
-## 词典
+## 词典加载与元数据
 
 核心词典默认请求只读 mmap；C API 先用 `scws2_t ctx = scws2_new()` 创建上下文，再用 `scws2_set_dict(ctx, path, 0)` 加载词典，或传 `SCWS2_DICT_MEMORY` 强制整库 fread 到私有内存；`scws2_free(ctx)` 统一释放词典和上下文。`scws2_segment()` 返回独立的 `scws2_result_t`，用 `scws2_result_next()` 遍历、`scws2_result_free()` 释放，可嵌套分词；结果在 ctx 释放后仍有效。契约见 [API.md](API.md)。mmap 不可用时退回内存。
 

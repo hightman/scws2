@@ -1,12 +1,14 @@
 # scws2 词典
 
+普通使用者可从 [GitHub Releases](https://github.com/hightman/scws2/releases) 下载预构建词典，无需自行构建。下载、源码构建及显式配置路径的完整流程见[根目录 README](../README.md#词典准备与配置)。
+
 目前交付的是可复现的基础词典构建链路；尚未完成检索质量评估，不能视为正式 2.0 词典。核心库及 PHP 扩展状态见根目录 README；旧版程序不能加载本目录生成的 XDB2。
 
 ## 维护入口
 
 本目录集中维护词典流水线及其输入：`build.py` 提供下载、加工、构建、校验和差异报告；`sources.lock.json` 锁定来源，`overrides.tsv` 保存人工修订，`jieba.LICENSE` 保存数据许可，`FORMAT.md` 定义 XDB2 格式。
 
-通用纯 C 词典编译器位于 `tools/scws2-dict.c`。原始下载保存在 `dict/.cache/`，构建产物保存在 `.cache/`；两者均不进入 Git，不混入本目录。
+通用纯 C 词典编译器位于 `tools/scws2-dict.c`。原始下载保存在 `dict/.cache/`，构建产物保存在 `dict/build/`；两者均不进入 Git。
 
 ## 独立构建
 
