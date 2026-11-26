@@ -28,6 +28,8 @@ class BuildTests(unittest.TestCase):
             for name in ('configure', 'configure.ac', 'Makefile.am', 'Makefile.in', 'aclocal.m4', 'config.h.in', 'VERSION', 'scws2.pc.in'):
                 shutil.copy2(ROOT / name, source / name)
             run([source / 'configure', '--prefix=' + str(prefix), '--disable-mmap', '--disable-text-cache'], root)
+            # An in-source generated header must not shadow this build's configured version.
+            (source / 'include/scws2_version.h').write_text('#define SCWS2_VERSION \"999.0.1\"\n')
             run(['make', '-j2', 'PYTHON=false', 'AUTOCONF=false', 'AUTOMAKE=false', 'ACLOCAL=false', 'AUTOHEADER=false'], root)
             run(['make', 'install', 'PYTHON=false', 'AUTOCONF=false', 'AUTOMAKE=false', 'ACLOCAL=false', 'AUTOHEADER=false'], root)
             self.assertTrue((prefix / 'include/scws2.h').is_file())

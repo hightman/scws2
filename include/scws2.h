@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-#include "scws2_version.h"
+#include <scws2_version.h>
 typedef struct scws2 *scws2_t;
 typedef struct scws2_result *scws2_result_t;
 typedef enum {
