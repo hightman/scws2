@@ -41,15 +41,14 @@ scws2 源自 [SCWS 1.x](https://github.com/hightman/scws) 的词典分词思路�
 make -j2
 make check
 
-# 首次使用：下载锁定的词典源并构建 XDB2
-python3 dict/build.py fetch
-python3 dict/build.py build
+# 词典单独构建：自动校验缓存，按需下载锁定的源文件
+make dict
 
 build/scws2 -d build/dict/dictionary.xdb --search -i '中文分词测试'
 printf '南京市长江大桥\n' | build/scws2 -d build/dict/dictionary.xdb
 ```
 
-只有显式 `fetch` 联网，构建和测试不会自动下载词典。构建生成静态库、共享库、CLI 和词典编译器。
+普通 `make` / `make all` 仅构建库、CLI 和词典编译器，不包含词典。`make dict` 先按锁文件校验缓存，缺失或校验失败时下载对应源文件，再构建 XDB2；有效缓存不会联网，也不检查上游浮动版本。默认测试不联网，直接执行 `python3 dict/build.py build` 仍为离线构建。
 
 辅助程序统一放在 `tools/`：`scws2.c` 用于分词测试，`scws2-dict.c` 用于编译词典，与评测及规则生成工具共同维护。
 
@@ -64,15 +63,22 @@ CLI 可不传 `-d`，此时仅使用内置规则和未知字符兜底。默认�
 ```sh
 make install PREFIX="$HOME/.local"
 
+# 构建词典后一起安装；也支持 make -j4 dict install
+make dict install PREFIX="$HOME/.local"
+
 # 打包暂存：写入 /tmp/scws2-package/usr/local/，不修改系统安装目录
 make install PREFIX=/usr/local DESTDIR=/tmp/scws2-package
 ```
 
-安装内容为 `include/scws2.h`、`lib/libscws2.a`、`lib/libscws2.so`（macOS 为 `.dylib`），以及 `bin/scws2`、`bin/scws2-dict`。不安装词典、运行时规则或 PHP 扩展。词典路径由调用方传入；规则已编译进库；PHP 扩展从完整仓库单独通过 phpize 构建，无需先安装 libscws2，见 [扩展说明](phpext/README.md)。
+安装内容为 `include/scws2.h`、`lib/libscws2.a`、`lib/libscws2.so`（macOS 为 `.dylib`），以及 `bin/scws2`、`bin/scws2-dict`。
+
+如果 `build/dict/dictionary.xdb` 存在，且目标缺失或源文件修改时间较新，还会安装到 `etc/dictionary.xdb`，并一同复制已有的 `LICENSE.jieba`、`manifest.json`；目标同样新或更新时跳过词典，不覆盖。词典更新使用同目录临时文件再原子替换，不截断已有 mmap。
+
+`make install` 不下载或构建词典；`make dict install` 则先成功完成词典构建，再安装，支持并行 make。运行时规则已编译进库，不另安装；词典路径仍由调用方传入。PHP 扩展从完整仓库单独通过 phpize 构建，不由根目录安装，无需先安装 libscws2，见 [扩展说明](phpext/README.md)。
 
 | 变量 | 默认值 | 用途 |
 | --- | --- | --- |
-| `PREFIX` | `/usr/local` | 安装前缀，影响 include/lib/bin 位置 |
+| `PREFIX` | `/usr/local` | 安装前缀，影响 include/lib/bin/etc 位置 |
 | `DESTDIR` | 空 | 打包暂存根目录，实际位置为 `DESTDIR + PREFIX` |
 | `CC` / `AR` | `cc` / `ar` | C 编译器及静态库归档工具 |
 | `PYTHON` | `python3` | 构建及测试使用的 Python 解释器 |

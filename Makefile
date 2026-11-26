@@ -64,14 +64,33 @@ rules:
 	$(PYTHON) -B tools/gen_rules.py --output build/rules_data.h
 
 dict: build/scws2-dict
+	$(PYTHON) -B dict/build.py fetch
 	$(PYTHON) -B dict/build.py build
 
-install: all
+# Explicit dict + install goals must be ordered, including parallel make.
+install: all $(filter dict,$(MAKECMDGOALS))
 	install -d $(DESTDIR)$(PREFIX)/include $(DESTDIR)$(PREFIX)/lib $(DESTDIR)$(PREFIX)/bin
 	install -m 644 include/scws2.h $(DESTDIR)$(PREFIX)/include/
 	install -m 644 build/libscws2.a $(SHARED) $(DESTDIR)$(PREFIX)/lib/
 	install -m 755 build/scws2 $(DESTDIR)$(PREFIX)/bin/
 	install -m 755 build/scws2-dict $(DESTDIR)$(PREFIX)/bin/scws2-dict
+	@if test -f build/dict/dictionary.xdb; then \
+		destination="$(DESTDIR)$(PREFIX)/etc"; \
+		if test ! -f "$$destination/dictionary.xdb" || test build/dict/dictionary.xdb -nt "$$destination/dictionary.xdb"; then \
+			set -e; \
+			install -d "$$destination"; \
+			stage=$$(mktemp -d "$$destination/.scws2-dict.XXXXXX"); \
+			trap 'rm -rf "$$stage"' 0; \
+			trap 'exit 1' 1 2 3 15; \
+			for name in dictionary.xdb LICENSE.jieba manifest.json; do \
+				if test -f "build/dict/$$name"; then install -p -m 644 "build/dict/$$name" "$$stage/$$name"; fi; \
+			done; \
+			for name in LICENSE.jieba manifest.json dictionary.xdb; do \
+				if test -f "$$stage/$$name"; then mv -f "$$stage/$$name" "$$destination/$$name"; fi; \
+			done; \
+			echo "Installed dictionary: $$destination/dictionary.xdb"; \
+		fi; \
+	fi
 
 clean:
 	rm -rf build

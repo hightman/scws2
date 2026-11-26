@@ -15,13 +15,12 @@
 ```sh
 make -j2
 make check
-python3 dict/build.py fetch
-python3 dict/build.py build
+make dict
 python3 dict/build.py check build/dict/dictionary.xdb
 build/scws2 -d build/dict/dictionary.xdb --search -i '中文分词测试'
 ```
 
-只有显式词典 `fetch` 或 `make fetch-eval` 联网；默认测试不依赖上游或本机词典。`build/`、`.cache/` 和 Python 缓存不提交，源词典快照应另行归档。运行库与词典编译器保持纯 C；Python 用于构建时生成规则表、离线加工、校验和测试。`make` 根据 `src/rules.ini` 和生成器的修改时间自动更新 `build/rules_data.h`；该文件及其他生成代码不提交 Git。`make rules` 可手动强制生成。
+`make dict` 自动校验词典源缓存，缺失或校验失败时下载锁定来源，再构建；单独的 `dict/build.py build` 保持离线。普通 make 和 install 不触发词典下载或构建；install 仅将已有且较新的词典及许可/清单安装到 `$PREFIX/etc`，支持 DESTDIR 和并行 `make dict install`。显式词典 fetch 或 `make fetch-eval` 也可能联网；默认测试不依赖上游或本机词典。`build/`、`.cache/` 和 Python 缓存不提交，源词典快照应另行归档。运行库与词典编译器保持纯 C；Python 用于构建时生成规则表、离线加工、校验和测试。`make` 根据 `src/rules.ini` 和生成器的修改时间自动更新 `build/rules_data.h`；该文件及其他生成代码不提交 Git。`make rules` 可手动强制生成。
 
 核心变更需要验证主路径、重叠补词、原文偏移、非法 UTF-8、词典损坏、上下文/结果独立生命周期、嵌套结果遍历、上下文错误隔离、词典替换失败保持原状态及独立上下文线程安全。`CORE_TEST_CFLAGS`、`DICT_TEST_CFLAGS` 可覆盖测试编译选项以启用 ASan/UBSan。不要将代码测试通过等同于真实检索质量验收。
 

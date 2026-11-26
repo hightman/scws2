@@ -77,8 +77,11 @@ def verified_source(item, cache):
 def fetch(lock, cache):
     for item in lock['source']['files']:
         path = Path(cache) / item['cache_name']
-        if path.exists():
+        try:
             verified_source(item, cache)
+        except (FileNotFoundError, ValueError):
+            pass  # Missing, outdated or damaged cache: replace only after verification.
+        else:
             continue
         with urllib.request.urlopen(item['url'], timeout=60) as response:
             data = response.read(item['bytes'] + 1)

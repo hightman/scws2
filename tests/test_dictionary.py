@@ -1,5 +1,6 @@
 """Offline dictionary integration tests. Compile the actual dependency-free C tool."""
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -179,6 +180,31 @@ class DictionaryTests(unittest.TestCase):
         lock = self.fixture()
         with mock.patch.object(dictionary.urllib.request, 'urlopen', side_effect=AssertionError('network used')):
             dictionary.fetch(lock, self.root)
+
+    def test_fetch_downloads_only_missing_or_invalid_cache(self):
+        lock = self.fixture()
+        item = lock['source']['files'][0]
+        path = self.root / item['cache_name']
+        content = path.read_bytes()
+        for missing in (True, False):
+            with self.subTest(missing=missing):
+                if missing:
+                    path.unlink()
+                else:
+                    path.write_bytes(b'damaged cache')
+                with mock.patch.object(dictionary.urllib.request, 'urlopen', return_value=io.BytesIO(content)) as request:
+                    dictionary.fetch(lock, self.root)
+                request.assert_called_once_with(item['url'], timeout=60)
+                self.assertEqual(path.read_bytes(), content)
+
+    def test_failed_download_preserves_existing_cache(self):
+        lock = self.fixture()
+        path = self.root / lock['source']['files'][0]['cache_name']
+        path.write_bytes(b'old damaged cache')
+        with mock.patch.object(dictionary.urllib.request, 'urlopen', return_value=io.BytesIO(b'bad download')):
+            with self.assertRaisesRegex(ValueError, 'download checksum'):
+                dictionary.fetch(lock, self.root)
+        self.assertEqual(path.read_bytes(), b'old damaged cache')
 
     def test_floating_or_wrong_source_url_rejected(self):
         lock = self.fixture()

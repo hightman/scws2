@@ -1,6 +1,6 @@
 # scws2 词典
 
-目前交付的是可复现的基础词典构建链路；尚未完成检索质量评估，不能视为正式 2.0 词典。核心库和 CLI 已有可运行原型，PHP 扩展尚未实现；旧版程序不能加载本目录生成的 XDB2。
+目前交付的是可复现的基础词典构建链路；尚未完成检索质量评估，不能视为正式 2.0 词典。核心库及 PHP 扩展状态见根目录 README；旧版程序不能加载本目录生成的 XDB2。
 
 ## 维护入口
 
@@ -13,15 +13,12 @@
 在仓库根目录执行。需要 C11 编译器和 Python 3.9+，均不依赖第三方包。
 
 ```sh
-mkdir -p build
-cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror tools/scws2-dict.c -o build/scws2-dict
-python3 dict/build.py fetch
-python3 dict/build.py build
+make dict
 python3 dict/build.py check build/dict/dictionary.xdb
 python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
 ```
 
-只有 `fetch` 联网；`build` 不自动下载，缓存不存在或校验失败时退出。发布包使用预先生成的 XDB，无需 Python 或网络。独立 C 编译器接受 `lexicon.tsv output.xdb`，不依赖 Python。
+`make dict` 自动调用 `fetch` 后再 `build`：先按 `sources.lock.json` 的尺寸与 SHA-256 校验缓存，只下载缺失或不匹配的源文件；下载验证成功后原子替换缓存，失败不覆盖旧文件。不检查浮动分支或远端更新时间。可单独执行 `python3 dict/build.py fetch`；直接调用 `python3 dict/build.py build` 仍保持离线，缓存不存在或校验失败时退出。发布包使用预先生成的 XDB，无需 Python 或网络。独立 C 编译器接受 `lexicon.tsv output.xdb`，不依赖 Python。
 
 输出目录 `build/dict/` 包含：
 
@@ -29,6 +26,18 @@ python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
 - `dictionary.xdb`：保留可选词性、不含 IDF 的 XDB2 schema 4 文件，包含固定尾标记；旧 schema 1/2/3 产物需重建。
 - `manifest.json`：来源 commit、源文件 SHA-256、加工版本与代码指纹、编译器指纹、修订及结果校验和、统计。
 - `LICENSE.jieba`：随词典分发的上游 MIT 许可。引擎许可参见根目录 `COPYING`。
+
+## 安装
+
+```sh
+make dict install PREFIX="$HOME/.local"
+# 打包安装时同样支持 DESTDIR
+make dict install PREFIX=/usr/local DESTDIR=/tmp/scws2-package
+```
+
+普通 `make` 不包含词典；`make install` 只检查已构建的 `build/dict/dictionary.xdb`，不触发下载或构建。目标缺失或源修改时间较新时安装为 `$PREFIX/etc/dictionary.xdb`，同时复制已有的 `LICENSE.jieba` 和 `manifest.json`；目标同样新或更新则跳过词典。使用 `DESTDIR` 时，实际路径在该暂存根目录下。
+
+安装保留源文件修改时间，以临时文件加原子替换更新 XDB，不原地截断 mmap 文件；已有上下文继续使用旧文件，新加载才使用新版。`make -j4 dict install` 也会先完成词典构建，失败则不执行安装。词典路径需由 C/PHP 调用方指定，不隐式加载安装目录。`lexicon.tsv` 不安装。
 
 ## 固定来源
 
@@ -64,7 +73,7 @@ python3 -m unittest discover -s tests -p 'test_dictionary.py' -v
 
 ## 更新与发布
 
-更新时修改完整 commit 和两个源文件的校验信息，用新缓存目录下载验证；不要覆盖锁定文件后复用不匹配的旧缓存。保留旧快照与输出目录用于比较。先检查新增、删除、频率及切分差异，通过检索评估后再发布；不自动追踪浮动分支、不自动发布。
+更新时修改完整 commit 和两个源文件的校验信息，先归档旧缓存与输出目录用于比较；下次 `make dict` 会按新锁文件重新下载不匹配的源文件，也可指定独立缓存目录手动 fetch/build。先检查新增、删除、频率及切分差异，通过检索评估后再发布；不自动追踪浮动分支、不自动发布。
 
 可用 `python3 dict/build.py diff build/dict-old build/dict-new` 比较两个加工目录，输出新增、删除、代价、用途与词性变化统计及有限样例；`--limit` 控制样例数。支持比较旧的无词性加工目录与当前四列词表。评分分母随主词集合变化，一次修订可能影响很多词的代价，须结合实际切分差异判断。
 
