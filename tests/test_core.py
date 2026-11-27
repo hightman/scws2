@@ -233,6 +233,17 @@ class CoreTests(unittest.TestCase):
         result = subprocess.run([str(self.api), str(self.dictionary), str(self.overlay)], capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr.decode())
 
+    def test_clone_reuses_loaded_dictionary_after_source_file_removal(self):
+        for api in (self.api, self.no_mmap_api):
+            for flags in range(4):
+                with self.subTest(api=api.name, flags=flags):
+                    path = self.root / 'clone-unlink-dict'
+                    path.write_bytes('中文 100 n\n'.encode() if flags & 2 else self.dictionary.read_bytes())
+                    result = subprocess.run([str(api), str(path), 'clone-unlink', str(flags)],
+                                            capture_output=True, timeout=15)
+                    self.assertEqual(result.returncode, 0, result.stderr.decode())
+                    self.assertFalse(path.exists())
+
     def test_cli_without_dictionary_uses_rules_and_unknown_characters(self):
         result = subprocess.run([str(self.cli), '-i', '中文 C++ 2026年'], capture_output=True, text=True, timeout=5)
         self.assertEqual(result.returncode, 0, result.stderr)

@@ -167,6 +167,80 @@ static int nested_results(const char *base, const char *overlay, scws2_dict_flag
 	return 0;
 }
 
+typedef struct { scws2_t ctx; int failed; } clone_task;
+static void *clone_worker(void *argument)
+{
+	clone_task *job = argument;
+	for (int i = 0; i < 100; i++) {
+		scws2_t copy = scws2_clone(job->ctx);
+		if (!copy) { job->failed = 1; break; }
+		if (expect_result(copy, "研究生命起源", 18, SCWS2_STANDARD, 3, 9)) job->failed = 1;
+		scws2_free(copy);
+	}
+	scws2_free(job->ctx);
+	return NULL;
+}
+
+static int cloning(const char *base, const char *overlay, scws2_dict_flags_t mode)
+{
+	scws2_t source = scws2_new(), copy, descendant, base_copy;
+	scws2_result_t retained;
+	pthread_t threads[4];
+	clone_task jobs[4];
+	CHECK(source && scws2_clone(NULL) == NULL);
+	copy = scws2_clone(source);
+	CHECK(copy && expect_result(copy, "中文", 6, SCWS2_STANDARD, 2, 3) == 0);
+	scws2_free(copy);
+	CHECK(scws2_set_dict(source, base, mode) == SCWS2_OK);
+	CHECK(scws2_add_dict(source, overlay, mode) == SCWS2_OK);
+	CHECK(scws2_set_options(source, SCWS2_KEEP_SYMBOLS | SCWS2_FALLBACK_BIGRAM) == SCWS2_OK);
+	CHECK(scws2_set_unknown_cost(source, 1) == SCWS2_OK);
+	CHECK(scws2_segment(source, "\xff", 1, SCWS2_STANDARD) == NULL);
+	copy = scws2_clone(source);
+	CHECK(copy && scws2_error_code(copy) == SCWS2_OK && scws2_error_code(source) == SCWS2_OK);
+	CHECK(expect_result(copy, "中文！", 9, SCWS2_STANDARD, 3, 3) == 0);
+	CHECK(expect_result(copy, "甲乙", 6, SCWS2_SEARCH, 3, 6) == 0);
+	CHECK(scws2_set_options(source, 0) == SCWS2_OK);
+	CHECK(scws2_set_unknown_cost(source, 18432) == SCWS2_OK);
+	CHECK(expect_result(source, "中文！", 9, SCWS2_STANDARD, 1, 6) == 0);
+	CHECK(expect_result(copy, "中文！", 9, SCWS2_STANDARD, 3, 3) == 0);
+	CHECK(scws2_set_options(copy, 0) == SCWS2_OK);
+	CHECK(scws2_set_unknown_cost(copy, 18432) == SCWS2_OK);
+	CHECK(scws2_segment(source, "\xff", 1, SCWS2_STANDARD) == NULL);
+	CHECK(expect_result(copy, "研究生命起源", 18, SCWS2_STANDARD, 3, 9) == 0);
+	CHECK(scws2_error_code(source) == SCWS2_EUTF8);
+	descendant = scws2_clone(copy);
+	CHECK(descendant);
+	CHECK(scws2_set_dict(copy, base, mode) == SCWS2_OK);
+	CHECK(expect_result(copy, "研究生命起源", 18, SCWS2_STANDARD, 3, 6) == 0);
+	CHECK(expect_result(descendant, "研究生命起源", 18, SCWS2_STANDARD, 3, 9) == 0);
+	base_copy = scws2_clone(copy);
+	CHECK(base_copy);
+	CHECK(scws2_add_dict(copy, overlay, mode) == SCWS2_OK);
+	CHECK(expect_result(copy, "研究生命起源", 18, SCWS2_STANDARD, 3, 9) == 0);
+	CHECK(expect_result(base_copy, "研究生命起源", 18, SCWS2_STANDARD, 3, 6) == 0);
+	scws2_free(base_copy);
+	CHECK(scws2_set_dict(source, overlay, mode) == SCWS2_OK);
+	CHECK(expect_result(source, "中文", 6, SCWS2_STANDARD, 2, 3) == 0);
+	CHECK(expect_result(copy, "中文", 6, SCWS2_STANDARD, 1, 6) == 0);
+	CHECK(scws2_set_dict(descendant, "", mode) == SCWS2_EIO);
+	CHECK(expect_result(descendant, "研究生命起源", 18, SCWS2_STANDARD, 3, 9) == 0);
+	retained = scws2_segment(copy, "研究生命起源", 18, SCWS2_STANDARD);
+	CHECK(retained && scws2_result_count(retained) == 3);
+	scws2_free(source); scws2_free(copy);
+	CHECK(expect_result(descendant, "研究生命起源", 18, SCWS2_STANDARD, 3, 9) == 0);
+	for (int i = 0; i < 4; i++) {
+		jobs[i] = (clone_task) {scws2_clone(descendant), 0};
+		CHECK(jobs[i].ctx);
+	}
+	scws2_free(descendant);
+	for (int i = 0; i < 4; i++) CHECK(pthread_create(&threads[i], NULL, clone_worker, &jobs[i]) == 0);
+	for (int i = 0; i < 4; i++) CHECK(pthread_join(threads[i], NULL) == 0 && !jobs[i].failed);
+	CHECK(scws2_result_next(retained)->length == 9);
+	scws2_result_free(retained);
+	return 0;
+}
+
 static int text_ownership(const char *base, const char *text, const char *malformed)
 {
 	scws2_t ctx = scws2_new();
@@ -185,7 +259,11 @@ static int text_ownership(const char *base, const char *text, const char *malfor
 	CHECK(expect_result(ctx, "中国", 6, SCWS2_STANDARD, 1, 6) == 0);
 	CHECK(scws2_set_dict(ctx, text, SCWS2_DICT_TEXT) == SCWS2_OK);
 	CHECK(expect_result(ctx, "研究生命起源", 18, SCWS2_STANDARD, 6, 3) == 0);
+	scws2_t copy = scws2_clone(ctx);
+	CHECK(copy);
 	scws2_free(ctx);
+	CHECK(expect_result(copy, "中国", 6, SCWS2_STANDARD, 1, 6) == 0);
+	scws2_free(copy);
 	CHECK(scws2_result_count(before) == 1 && scws2_result_count(after) == 3);
 	scws2_result_free(before); scws2_result_free(after);
 	return 0;
@@ -223,6 +301,23 @@ static int compare_modes(const char *path, const char *overlay)
 	return 0;
 }
 
+/* Python supplies a disposable fixture: cloning must not reopen its path. */
+static int clone_unlinked(const char *filename, scws2_dict_flags_t flags)
+{
+	scws2_t source = scws2_new(), copy, descendant;
+	CHECK(source && scws2_set_dict(source, filename, flags) == SCWS2_OK);
+	CHECK(remove(filename) == 0);
+	copy = scws2_clone(source);
+	CHECK(copy);
+	scws2_free(source);
+	descendant = scws2_clone(copy);
+	CHECK(descendant);
+	scws2_free(copy);
+	CHECK(expect_result(descendant, "中文", 6, SCWS2_STANDARD, 1, 6) == 0);
+	scws2_free(descendant);
+	return 0;
+}
+
 #ifndef SCWS2_NO_MMAP
 static int replace_file(const char *path, const char *replacement)
 {
@@ -246,6 +341,9 @@ int main(int argc, char **argv)
 	scws2_t ctx = scws2_new();
 	CHECK(ctx);
 	CHECK(argc >= 2);
+	if (argc == 4 && !strcmp(argv[2], "clone-unlink")) {
+		scws2_free(ctx); return clone_unlinked(argv[1], (scws2_dict_flags_t) atoi(argv[3]));
+	}
 	if (argc == 5 && !strcmp(argv[2], "text-result")) {
 		scws2_free(ctx); return text_ownership(argv[1], argv[3], argv[4]);
 	}
@@ -267,9 +365,11 @@ int main(int argc, char **argv)
 	CHECK(exercise(argv[1], 0) == 0);
 	CHECK(ownership(argv[1], argv[2], 0) == 0);
 	CHECK(nested_results(argv[1], argv[2], 0) == 0);
+	CHECK(cloning(argv[1], argv[2], 0) == 0);
 	CHECK(exercise(argv[1], SCWS2_DICT_MEMORY) == 0);
 	CHECK(ownership(argv[1], argv[2], SCWS2_DICT_MEMORY) == 0);
 	CHECK(nested_results(argv[1], argv[2], SCWS2_DICT_MEMORY) == 0);
+	CHECK(cloning(argv[1], argv[2], SCWS2_DICT_MEMORY) == 0);
 	CHECK(compare_modes(argv[1], argv[2]) == 0);
 	scws2_free(ctx);
 	return 0;

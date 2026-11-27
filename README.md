@@ -162,7 +162,7 @@ python3 tools/check_segments.py --case case-07-standard --case case-07-search
 
 ## 词典加载与元数据
 
-核心词典默认请求只读 mmap；C API 先用 `scws2_t ctx = scws2_new()` 创建上下文，再用 `scws2_set_dict(ctx, path, 0)` 加载词典，或传 `SCWS2_DICT_MEMORY` 强制整库 fread 到私有内存；`scws2_free(ctx)` 统一释放词典和上下文。`scws2_segment()` 返回独立的 `scws2_result_t`，用 `scws2_result_next()` 遍历、`scws2_result_free()` 释放，可嵌套分词；结果在 ctx 释放后仍有效。契约见 [API.md](API.md)。mmap 不可用时退回内存。
+核心词典默认请求只读 mmap；C API 先用 `scws2_t ctx = scws2_new()` 创建上下文，再用 `scws2_set_dict(ctx, path, 0)` 加载词典，或传 `SCWS2_DICT_MEMORY` 强制整库 fread 到私有内存；`scws2_free(ctx)` 统一释放词典引用和上下文。`scws2_clone(ctx)` 复制配置并共享已加载的只读词典（包括内存及 mmap 模式），各克隆可供不同线程独立使用；同一上下文不能并发操作。`scws2_segment()` 返回独立的 `scws2_result_t`，用 `scws2_result_next()` 遍历、`scws2_result_free()` 释放，可嵌套分词；结果在 ctx 释放后仍有效。契约见 [API.md](API.md)。mmap 不可用时退回内存。
 
 运行时可用 `scws2_add_dict(ctx, "user.txt", SCWS2_DICT_TEXT)` 加载 UTF-8 自定义词表。一行一个词，支持空格/Tab 分隔的 `词条 词频 词性` 或 `词条 词性 词频`；缺省词性为 `un`，缺省及 `0` 词频按最低值 `1` 处理。文本自动编译并缓存为临时 XDB，后续加载跨进程复用；默认请求 mmap，按位组合 `SCWS2_DICT_TEXT | SCWS2_DICT_MEMORY` 可强制内存加载，不记忆前次加载方式。格式、词频参考及缓存说明见 [API.md](API.md#文本词典)，词性说明见 [dict/POS.md](dict/POS.md)。
 

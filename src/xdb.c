@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdatomic.h>
 
 #if defined(SCWS2_HAVE_MMAP) && !defined(SCWS2_NO_MMAP)
 #include <sys/mman.h>
@@ -16,7 +17,12 @@
 #define HEADER 64u
 #define TRAILER 8u
 #define MAX_DICTIONARY_BYTES (512u * 1024u * 1024u)
-struct scws2_dict { unsigned char *data; uint32_t size, buckets, base; int mapped; };
+struct scws2_dict {
+	unsigned char *data;
+	uint32_t size, buckets, base;
+	int mapped;
+	atomic_size_t references;
+};
 
 static uint32_t u32(const unsigned char *p)
 {
@@ -90,6 +96,7 @@ scws2_status_t scws2_dict_from_data(unsigned char *data, uint32_t size, scws2_di
 	scws2_dict_t *dict = calloc(1, sizeof(*dict));
 	scws2_status_t status;
 	if (!dict) { free(data); return SCWS2_ENOMEM; }
+	atomic_init(&dict->references, 1);
 	dict->data = data; dict->size = size;
 	status = validate(dict);
 	if (status) { scws2_dict_close(dict); return status; }
@@ -117,6 +124,7 @@ scws2_status_t scws2_dict_open_ex(const char *path, scws2_dict_flags_t flags, sc
 	}
 	dict = calloc(1, sizeof(*dict));
 	if (!dict) { fclose(fp); return SCWS2_ENOMEM; }
+	atomic_init(&dict->references, 1);
 	dict->size = (uint32_t) length;
 #if defined(SCWS2_HAVE_MMAP) && !defined(SCWS2_NO_MMAP)
 	if (!(flags & SCWS2_DICT_MEMORY)) {
@@ -136,9 +144,20 @@ scws2_status_t scws2_dict_open_ex(const char *path, scws2_dict_flags_t flags, sc
 	*out = dict;
 	return SCWS2_OK;
 }
+/* The caller owns a live reference, so another thread cannot destroy dict. */
+scws2_status_t scws2_dict_retain(scws2_dict_t *dict)
+{
+	size_t count = atomic_load_explicit(&dict->references, memory_order_relaxed);
+	do {
+		if (count == SIZE_MAX) return SCWS2_ELIMIT;
+	} while (!atomic_compare_exchange_weak_explicit(&dict->references, &count, count + 1,
+		memory_order_relaxed, memory_order_relaxed));
+	return SCWS2_OK;
+}
 void scws2_dict_close(scws2_dict_t *dict)
 {
 	if (!dict) return;
+	if (atomic_fetch_sub_explicit(&dict->references, 1, memory_order_acq_rel) != 1) return;
 #if defined(SCWS2_HAVE_MMAP) && !defined(SCWS2_NO_MMAP)
 	if (dict->mapped) munmap(dict->data, dict->size);
 	else

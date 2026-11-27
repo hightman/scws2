@@ -31,10 +31,18 @@ typedef struct {
 
 /* NULL on allocation failure; starts with built-in rules and no dictionary. */
 scws2_t scws2_new(void);
-/* Frees the context and its dictionaries, not returned results; NULL is accepted. */
+/* Copies options and unknown cost, sharing immutable dictionaries (no reload).
+ * The new context has independent configuration, errors and lifetime.
+ * NULL source returns NULL; other failures set the source error; success clears
+ * it and starts the clone at OK. Source must not be used concurrently, including
+ * by another clone call. Different contexts may be used concurrently. */
+scws2_t scws2_clone(scws2_t source);
+/* Frees the context and releases its dictionary references, not returned results;
+ * the last reference closes a dictionary. NULL is accepted. */
 void scws2_free(scws2_t ctx);
-/* Replace all dictionaries, or append an overlay. The context owns all loaded
- * data. Failure preserves existing dictionaries. Flags: 0 requests a read-only
+/* Replace all dictionaries, or append an overlay, only in this context.
+ * The context owns its references. Failure preserves existing dictionaries.
+ * Flags: 0 requests a read-only
  * mapping of the XDB; MEMORY forces fread; TEXT compiles/caches UTF-8 rows.
  * TEXT | MEMORY combines both. If mapping is unavailable, use memory instead. */
 scws2_status_t scws2_set_dict(scws2_t ctx, const char *path, scws2_dict_flags_t flags);

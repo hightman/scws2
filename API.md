@@ -10,7 +10,8 @@
 | 函数 | 用途 |
 | --- | --- |
 | `scws2_t scws2_new(void)` | 创建上下文，分配失败返回 NULL |
-| `void scws2_free(scws2_t ctx)` | 释放上下文及全部词典，不释放已返回结果 |
+| `scws2_t scws2_clone(scws2_t source)` | 复制配置并共享只读词典，返回独立上下文，失败返回 NULL |
+| `void scws2_free(scws2_t ctx)` | 释放上下文及其词典引用，不释放已返回结果 |
 | `scws2_status_t scws2_set_dict(scws2_t ctx, const char *path, scws2_dict_flags_t flags)` | 替换全部词典 |
 | `scws2_status_t scws2_add_dict(scws2_t ctx, const char *path, scws2_dict_flags_t flags)` | 追加叠加词典 |
 | `scws2_status_t scws2_set_options(scws2_t ctx, unsigned flags)` | 覆盖行为选项 |
@@ -82,9 +83,33 @@ mmap 使用 `PROT_READ`、`MAP_SHARED`，多进程可共享文件页缓存。`SC
 
 映射使用期间不得原地修改或截断文件。更新应生成新文件再替换路径，已有上下文继续引用旧文件，重新加载才使用新文件。已加载的上下文不自动监测更新；重新加载 TEXT 时检查源文件元数据。
 
-`scws2_free()` 自动关闭全部词典并释放上下文；已返回结果由调用方用 `scws2_result_free()` 单独释放。各上下文独立拥有加载的数据；内存模式多次加载同一文件会产生独立副本，目前没有全局缓存或跨上下文词典句柄共享。不同线程可分别使用各自上下文，同一个上下文不能并发操作，同一个结果的游标也不能并发读取。
+`scws2_free()` 释放上下文及其全部词典引用，最后一个引用释放时才关闭词典；已返回结果由调用方用 `scws2_result_free()` 单独释放。分别加载同一文件仍产生独立的词典对象，内存模式会产生独立的数据副本；没有全局词典对象缓存。需要复用已加载的词典时使用 `scws2_clone()`。不同线程可分别使用各自上下文，同一个上下文不能并发操作，同一个结果的游标也不能并发读取。
 
 XDB2 叠加词典可把完整词标为只补词以阻止其参与主切分。当前没有运行时禁用词的 tombstone 标志，构建阶段的 `deny` 不等于删除另一份叠加词典中的词。
+
+### 克隆与多线程复用
+
+`scws2_clone(source)` 复制行为选项、未知单字代价和有序词典列表，基础词典及叠加词典通过内部 C11 原子引用计数共享。无论内存、mmap 还是 TEXT 编译的词典，都不重新打开文件、编译、校验或复制词典数据；未加载词典的上下文也可克隆。克隆不包含此前的分词结果。
+
+新上下文的错误状态为 `SCWS2_OK`。成功清除 source 的错误；分配失败返回 NULL 并将 source 错误设为 `SCWS2_ENOMEM`，引用计数达到上限时为 `SCWS2_ELIMIT`。传入 NULL 返回 NULL。失败保留 source 的配置和词典。
+
+各上下文的配置、错误和生命周期独立：任一方替换或追加词典只改变自己的列表，释放 source 不影响克隆，克隆还可以继续克隆。共享词典的实际加载方式不变；mmap 的文件更新约束仍然适用。
+
+推荐初始化一个模板上下文，加载词典并配置后，为每个工作线程依次创建克隆，再交给线程独立使用。克隆调用会访问 source 并更新其错误，不能与同一 source 的其他操作（包括另一个克隆调用）并发；不同上下文可以同时克隆、分词、修改配置或释放，即使它们共享词典。同一上下文加外部锁也可在线程间串行使用，错误查询应包含在对应操作的锁内。
+
+```c
+scws2_t source = scws2_new();
+if (!source) return 1;
+if (scws2_set_dict(source, "dict.xdb", SCWS2_DICT_MEMORY) != SCWS2_OK) {
+    scws2_free(source);
+    return 1;
+}
+scws2_t worker = scws2_clone(source);
+/* 失败时可在释放 source 前查询其错误。 */
+scws2_free(source);
+if (!worker) return 1;
+/* worker 可由一个工作线程持续复用，结束时 scws2_free(worker)。 */
+```
 
 ## 文本词典
 

@@ -84,6 +84,30 @@ scws2_t scws2_new(void)
 	if (ctx) ctx->unknown_cost = 18432;
 	return ctx;
 }
+scws2_t scws2_clone(scws2_t source)
+{
+	scws2_t clone;
+	scws2_status_t status;
+	if (!source) return NULL;
+	clone = scws2_new();
+	if (!clone) { set_error(source, SCWS2_ENOMEM); return NULL; }
+	if (source->dict_count) {
+		clone->dicts = calloc(source->dict_count, sizeof(*clone->dicts));
+		if (!clone->dicts) {
+			scws2_free(clone); set_error(source, SCWS2_ENOMEM); return NULL;
+		}
+		clone->dict_capacity = source->dict_count;
+		for (size_t i = 0; i < source->dict_count; i++) {
+			status = scws2_dict_retain(source->dicts[i]);
+			if (status) { scws2_free(clone); set_error(source, status); return NULL; }
+			clone->dicts[clone->dict_count++] = source->dicts[i];
+		}
+	}
+	clone->flags = source->flags;
+	clone->unknown_cost = source->unknown_cost;
+	set_error(source, SCWS2_OK);
+	return clone;
+}
 void scws2_free(scws2_t ctx)
 {
 	if (!ctx) return;
